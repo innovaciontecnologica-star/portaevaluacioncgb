@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evaluación Docente v1.0 | Colegio Gran Bretaña</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Nunito:wght@600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f0f4f8; }
+        .step-transition { transition: opacity 0.3s ease-in-out; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div id="main-container" class="bg-white rounded-2xl shadow-xl w-full max-w-xl overflow-hidden border border-gray-100 relative">
+        <div class="h-2 w-full bg-gradient-to-r from-[#E85A14] via-[#CE1126] to-[#27316A]"></div>
+        <div class="bg-white p-6 text-center border-b border-gray-100">
+            <p class="text-[#E85A14] mt-1 text-sm font-bold uppercase tracking-wider">Portal de Evaluación Docente <span class="text-gray-400">v1.0</span></p>
+            <p class="text-xs text-gray-400 mt-2 italic">L.I.E. Arturo Palacios González | Innovación Tecnológica CGB</p>
+        </div>
+
+        <div class="p-6">
+            <div id="step-level" class="step-transition">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 text-center">Selecciona tu nivel</h2>
+                <select id="school-level" class="w-full p-3 border border-gray-300 rounded-lg">
+                    <option value="">-- Selecciona --</option>
+                    <option value="primaria_baja">Primaria Baja</option>
+                    <option value="primaria_alta">Primaria Alta</option>
+                    <option value="secundaria">Secundaria</option>
+                    <option value="admin">Administrador</option>
+                </select>
+                <button onclick="processLevel()" class="mt-4 w-full bg-[#27316A] text-white py-3 rounded-lg">Continuar</button>
+            </div>
+
+            <div id="step-auth" class="step-transition hidden">
+                <h2 class="text-xl font-semibold mb-2">Verificación de Administrador</h2>
+                <input type="email" id="admin-email" placeholder="correo@cgb.mx" class="w-full p-3 border rounded-lg">
+                <button onclick="verifyAdmin()" class="mt-4 w-full bg-[#E85A14] text-white py-3 rounded-lg">Verificar Acceso</button>
+                <button onclick="goBack('step-level')" class="mt-2 w-full text-gray-400 text-sm">Volver</button>
+            </div>
+
+            <div id="step-evaluation" class="step-transition hidden">
+                <h2 class="text-xl font-semibold mb-4">Selecciona docente</h2>
+                <select id="teacher-select" class="w-full p-3 border rounded-lg"></select>
+                <button onclick="goBack('step-level')" class="mt-4 w-full text-gray-500">Volver</button>
+            </div>
+
+            <div id="step-dashboard" class="step-transition hidden">
+                <h2 class="text-2xl font-bold text-[#27316A]">Panel de Administración</h2>
+                <p class="text-xs text-[#E85A14] italic mb-4">Bienvenido, L.I.E. Arturo Palacios González</p>
+                <button onclick="location.reload()" class="bg-gray-200 px-4 py-2 rounded text-sm">Cerrar sesión</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ¡IMPORTANTE! Reemplaza esto con tu URL de despliegue real de Google Apps Script
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwvh1PjHy7E8jwY287hRnIXhmTG1rb9225tkRdWFf6gvizSCyNRCV2f_ylNbzoac9Ah/exec'; 
+        let globalTeachers = [];
+
+        // Carga inicial de datos desde el Sheet
+        async function loadDataFromSheet() {
+            try {
+                // Aquí el fetch llamará a tu función doGet en el .gs
+                // const response = await fetch(APPS_SCRIPT_URL + '?action=getTeachers');
+                // globalTeachers = await response.json();
+                
+                // Simulación para que veas que la estructura funciona
+                console.log("Cargando maestros desde el Sheet...");
+            } catch (err) {
+                console.error("Error al conectar con el Sheet", err);
+            }
+        }
+
+        function processLevel() {
+            const level = document.getElementById('school-level').value;
+            if(!level) return alert("Selecciona un nivel");
+            
+            if(level === 'admin') {
+                hideAll(); document.getElementById('step-auth').classList.remove('hidden');
+            } else {
+                hideAll(); document.getElementById('step-evaluation').classList.remove('hidden');
+                filterTeachersByLevel(level);
+            }
+        }
+
+        function filterTeachersByLevel(nivel) {
+            const select = document.getElementById('teacher-select');
+            select.innerHTML = '<option>-- Elige un docente --</option>';
+            // Aquí se filtraría globalTeachers según el nivel seleccionado
+        }
+
+        function verifyAdmin() {
+            const email = document.getElementById('admin-email').value;
+            // Aquí el fetch debe verificar contra la columna de correos autorizados en tu Sheet
+            if(email.includes("@cgb.mx")) { 
+                hideAll(); document.getElementById('step-dashboard').classList.remove('hidden');
+            } else {
+                alert("Correo no autorizado.");
+            }
+        }
+
+        function hideAll() {
+            document.querySelectorAll('.step-transition').forEach(el => el.classList.add('hidden'));
+        }
+        
+        function goBack(id) { hideAll(); document.getElementById(id).classList.remove('hidden'); }
+
+        window.onload = loadDataFromSheet;
+    </script>
+</body>
+</html>
