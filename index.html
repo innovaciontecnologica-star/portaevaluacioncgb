@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evaluación Docente v1.0 | Colegio Gran Bretaña</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Nunito:wght@600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f0f4f8; }
+        .step-transition { transition: opacity 0.3s ease-in-out; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div id="main-container" class="bg-white rounded-2xl shadow-xl w-full max-w-xl overflow-hidden border border-gray-100 relative">
+        <div class="h-2 w-full bg-gradient-to-r from-[#E85A14] via-[#CE1126] to-[#27316A]"></div>
+        <div class="bg-white p-6 text-center border-b border-gray-100">
+            <p class="text-[#E85A14] mt-1 text-sm font-bold uppercase tracking-wider">Portal de Evaluación Docente <span class="text-gray-400">v1.0</span></p>
+            <p class="text-xs text-gray-400 mt-2 italic">L.I.E. Arturo Palacios González | Innovación Tecnológica CGB</p>
+        </div>
+
+        <div class="p-6">
+            <!-- Paso 1: Selección de Nivel -->
+            <div id="step-level" class="step-transition">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 text-center">Selecciona tu nivel</h2>
+                <select id="school-level" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#27316A] outline-none">
+                    <option value="">-- Selecciona --</option>
+                    <option value="primaria_baja">Primaria Baja</option>
+                    <option value="primaria_alta">Primaria Alta</option>
+                    <option value="secundaria">Secundaria</option>
+                    <option value="admin">Administrador</option>
+                </select>
+                <button onclick="processLevel()" class="mt-4 w-full bg-[#27316A] text-white py-3 rounded-lg hover:bg-[#1a214d] transition-colors">Continuar</button>
+            </div>
+
+            <!-- Paso 2: Autenticación Admin -->
+            <div id="step-auth" class="step-transition hidden">
+                <h2 class="text-xl font-semibold mb-2">Verificación de Administrador</h2>
+                <input type="email" id="admin-email" placeholder="correo@cgb.mx" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#E85A14] outline-none">
+                <button onclick="verifyAdmin()" class="mt-4 w-full bg-[#E85A14] text-white py-3 rounded-lg hover:bg-[#cc4d0e] transition-colors">Verificar Acceso</button>
+                <button onclick="goBack('step-level')" class="mt-2 w-full text-gray-400 text-sm hover:text-gray-600">Volver</button>
+            </div>
+
+            <!-- Paso 3: Selección de Maestro -->
+            <div id="step-evaluation" class="step-transition hidden">
+                <h2 class="text-xl font-semibold mb-4">Selecciona al docente a evaluar</h2>
+                <select id="teacher-select" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#27316A] outline-none">
+                    <option>Cargando docentes...</option>
+                </select>
+                <button onclick="goBack('step-level')" class="mt-4 w-full text-gray-500 hover:text-gray-700">Volver</button>
+            </div>
+
+            <!-- Dashboard Admin -->
+            <div id="step-dashboard" class="step-transition hidden">
+                <h2 class="text-2xl font-bold text-[#27316A]">Panel de Administración</h2>
+                <p class="text-xs text-[#E85A14] italic mb-4">Bienvenido, L.I.E. Arturo Palacios González</p>
+                <button onclick="location.reload()" class="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded text-sm transition-colors">Cerrar sesión</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ¡IMPORTANTE! Pega aquí tu URL de Google Apps Script publicada
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxjjPEhr3RbqM1uxC6JbcvkgZxZf9O3L6rop2PNkoXn2qYavSyZ-96yftwKCGQRL-Ku/exec'; 
+        let globalTeachers = [];
+
+        async function loadDataFromSheet() {
+            try {
+                const response = await fetch(APPS_SCRIPT_URL + '?action=getTeachers');
+                globalTeachers = await response.json();
+            } catch (err) {
+                console.error("Error al conectar:", err);
+            }
+        }
+
+        function processLevel() {
+            const level = document.getElementById('school-level').value;
+            if(!level) return alert("Por favor, selecciona un nivel.");
+            
+            if(level === 'admin') {
+                hideAll(); document.getElementById('step-auth').classList.remove('hidden');
+            } else {
+                hideAll(); document.getElementById('step-evaluation').classList.remove('hidden');
+                filterTeachersByLevel(level);
+            }
+        }
+
+        function filterTeachersByLevel(nivel) {
+            const select = document.getElementById('teacher-select');
+            select.innerHTML = '<option value="">-- Elige un docente --</option>';
+            const filtered = globalTeachers.filter(t => t.nivel === nivel);
+            
+            if(filtered.length === 0) {
+                select.innerHTML = '<option value="">No hay docentes registrados en este nivel</option>';
+            } else {
+                filtered.forEach(t => {
+                    let opt = document.createElement('option');
+                    opt.value = t.nombre;
+                    opt.textContent = t.nombre;
+                    select.appendChild(opt);
+                });
+            }
+        }
+
+        function verifyAdmin() {
+            const email = document.getElementById('admin-email').value;
+            if(email.toLowerCase().endsWith("@cgb.mx")) { 
+                hideAll(); document.getElementById('step-dashboard').classList.remove('hidden');
+            } else {
+                alert("Acceso denegado. Se requiere correo institucional.");
+            }
+        }
+
+        function hideAll() {
+            document.querySelectorAll('.step-transition').forEach(el => el.classList.add('hidden'));
+        }
+        
+        function goBack(id) { hideAll(); document.getElementById(id).classList.remove('hidden'); }
+
+        window.onload = loadDataFromSheet;
+    </script>
+</body>
+</html>
