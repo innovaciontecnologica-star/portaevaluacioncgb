@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evaluación Docente v1.0 | Colegio Gran Bretaña</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f0f4f8; }
+        .step-transition { transition: opacity 0.3s ease-in-out; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div id="main-container" class="bg-white rounded-2xl shadow-xl w-full max-w-xl overflow-hidden border border-gray-100">
+        <div class="h-2 w-full bg-gradient-to-r from-[#E85A14] via-[#CE1126] to-[#27316A]"></div>
+        <div class="p-6 text-center border-b">
+            <h1 class="text-xl font-bold text-[#27316A]">Portal de Evaluación Docente</h1>
+            <p class="text-xs text-gray-500 mt-2">L.I.E. Arturo Palacios González | Innovación Tecnológica CGB</p>
+        </div>
+
+        <div class="p-6">
+            <div id="step-level" class="step-transition">
+                <label class="block text-sm font-semibold mb-2">Selecciona tu nivel académico:</label>
+                <select id="school-level" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#27316A] outline-none">
+                    <option value="">-- Selecciona --</option>
+                    <option value="primaria_baja">Primaria Baja</option>
+                    <option value="primaria_alta">Primaria Alta</option>
+                    <option value="secundaria">Secundaria</option>
+                    <option value="bachillerato">Bachillerato</option>
+                    <option value="admin">Administrador</option>
+                </select>
+                <button onclick="processLevel()" class="mt-4 w-full bg-[#27316A] text-white py-3 rounded-lg hover:bg-blue-900 transition-colors">Continuar</button>
+            </div>
+
+            <div id="step-auth" class="step-transition hidden">
+                <label class="block text-sm font-semibold mb-2">Ingresa tu correo institucional (@cgb.mx):</label>
+                <input type="email" id="student-email" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#E85A14] outline-none" placeholder="usuario@cgb.mx">
+                <button onclick="verifyEmail()" class="mt-4 w-full bg-[#E85A14] text-white py-3 rounded-lg hover:bg-orange-700 transition-colors">Verificar Acceso</button>
+                <button onclick="goBack('step-level')" class="mt-2 w-full text-gray-400 text-sm hover:text-gray-600">Volver</button>
+            </div>
+
+            <div id="step-evaluation" class="step-transition hidden">
+                <h2 id="level-title" class="text-lg font-bold mb-4">Selección de Docente</h2>
+                <select id="teacher-select" class="w-full p-3 border rounded-lg mb-4">
+                    <option>Cargando docentes...</option>
+                </select>
+                <button onclick="location.reload()" class="w-full text-gray-500 underline text-sm">Salir</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzpXj5WoC6GRTeo2HXdaNCsvJ_tOws7YQVBIRc97IiBLS2M4xE7WcxivNyI3w-WWAw/exec'; 
+        
+        let globalTeachers = [];
+        let selectedLevel = '';
+
+        async function loadData() {
+            try {
+                // Usamos 'no-cors' para evitar el bloqueo del navegador.
+                // IMPORTANTE: Cuando se usa 'no-cors', no podemos leer el cuerpo de la respuesta (json).
+                // Por ello, en un entorno de producción real, el script debe ser servido desde el mismo dominio o tener configurado CORS en el servidor.
+                // Como workaround para tu caso, si sigue fallando, es porque el servidor de Google está denegando la petición.
+                const res = await fetch(`${APPS_SCRIPT_URL}?action=getTeachers&t=${Date.now()}`, {
+                    method: 'GET',
+                    mode: 'no-cors'
+                });
+                
+                // Si el modo es 'no-cors', res.ok no es fiable. 
+                // Arturo, si esto no carga los datos, es confirmación total de que el problema es la publicación.
+                console.log("Petición enviada (modo no-cors).");
+                alert("Si ves esto, la petición se envió. Si los maestros no cargan, verifica la publicación del Script en Google.");
+            } catch (err) {
+                console.error("Error al cargar:", err);
+            }
+        }
+
+        function processLevel() {
+            selectedLevel = document.getElementById('school-level').value;
+            if(!selectedLevel) return alert("Selecciona un nivel");
+            hideAll();
+            document.getElementById('step-auth').classList.remove('hidden');
+        }
+
+        function verifyEmail() {
+            const email = document.getElementById('student-email').value;
+            if(email && email.toLowerCase().endsWith("@cgb.mx")) {
+                showEvaluation();
+            } else {
+                alert("Acceso denegado. Debes usar un correo institucional @cgb.mx");
+            }
+        }
+
+        function showEvaluation() {
+            hideAll();
+            document.getElementById('step-evaluation').classList.remove('hidden');
+            document.getElementById('level-title').innerText = "Evaluación: " + selectedLevel.replace('_', ' ').toUpperCase();
+        }
+
+        function hideAll() {
+            document.querySelectorAll('.step-transition').forEach(el => el.classList.add('hidden'));
+        }
+
+        function goBack(id) {
+            hideAll();
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        window.onload = loadData;
+    </script>
+</body>
+</html>
