@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evaluación Docente v1.0 | Colegio Gran Bretaña</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Nunito:wght@600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f0f4f8; }
+        .font-kids { font-family: 'Nunito', sans-serif; } 
+        .step-transition { transition: opacity 0.3s ease-in-out; }
+        
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.35) rotate(-5deg); }
+            100% { transform: scale(1.25) rotate(0deg); }
+        }
+
+        .emoji-radio:checked + div { animation: pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.15)); }
+        .emoji-radio:checked ~ span { font-weight: 800; color: #27316A; }
+        .emoji-container { transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .emoji-container:hover { transform: scale(1.1); }
+        .materia-radio:checked + span { background-color: #E85A14; color: white; border-color: #E85A14; transform: scale(1.08) translateY(-2px); box-shadow: 0 10px 15px -3px rgba(232, 90, 20, 0.3); }
+        .materia-pill { transition: all 0.2s ease; display: inline-block; }
+
+        .san-radio:checked + div { background-color: #27316A; color: white; border-color: #27316A; font-weight: 600; box-shadow: 0 4px 6px -1px rgba(39, 49, 106, 0.3); transform: translateY(-1px); }
+        .san-container { transition: all 0.2s ease; }
+        .materia-checkbox:checked + span { background-color: #27316A; color: white; border-color: #27316A; }
+        .materia-pill-check { transition: all 0.2s ease; display: inline-block; }
+        
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Loader Overlay */
+        #loader { transition: opacity 0.3s; }
+        .spinner { border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid white; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <!-- OVERLAY DE CARGA -->
+    <div id="loader" class="fixed inset-0 bg-[#27316A]/90 z-[100] flex flex-col items-center justify-center hidden">
+        <div class="spinner mb-4"></div>
+        <p class="text-white font-semibold tracking-wide" id="loader-text">Conectando...</p>
+    </div>
+
+    <div id="main-container" class="bg-white rounded-2xl shadow-xl w-full max-w-xl overflow-hidden border border-gray-100 relative transition-all duration-500">
+        
+        <div class="h-2 w-full bg-gradient-to-r from-[#E85A14] via-[#CE1126] to-[#27316A]"></div>
+        <div class="bg-white p-6 text-center border-b border-gray-100">
+            <img src="Logo.png" alt="Logo Colegio Gran Bretaña" class="h-16 mx-auto mb-3 object-contain" onerror="this.onerror=null; this.src='https://placehold.co/400x120/ffffff/27316a?text=Colegio+Gran+Breta%C3%B1a';">
+            <p class="text-[#E85A14] mt-1 text-sm font-bold uppercase tracking-wider">Portal de Evaluación Docente <span class="text-gray-400">v1.0</span></p>
+            <p class="text-xs text-gray-400 mt-2 italic">L.I.E. Arturo Palacios González | Innovación Tecnológica CGB</p>
+        </div>
+
+        <div class="p-6 md:p-8">
+            <!-- Paso 1: Nivel -->
+            <div id="step-level" class="step-transition">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 text-center">¡Bienvenido!</h2>
+                <p class="text-gray-600 mb-6 text-center text-sm">Para comenzar, indícanos en qué nivel te encuentras.</p>
+                
+                <div class="space-y-4">
+                    <label class="block text-sm font-medium text-gray-700">Selecciona una opción</label>
+                    <select id="school-level" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#27316A] focus:border-[#27316A] outline-none transition">
+                        <option value="">-- Selecciona --</option>
+                        <option value="primaria_baja">Primaria Baja (1º a 3º)</option>
+                        <option value="primaria_alta">Primaria Alta (4º a 6º)</option>
+                        <option value="secundaria">Secundaria</option>
+                        <option value="bachillerato">Bachillerato</option>
+                        <option value="personal_cgb">Personal CGB (Staff)</option>
+                        <option value="admin" class="font-bold text-[#E85A14]">Administrador (Dashboard)</option>
+                    </select>
+                </div>
+                
+                <button onclick="processLevel()" class="mt-8 w-full bg-[#27316A] hover:bg-[#1a214d] text-white font-semibold py-3 px-4 rounded-lg shadow transition duration-200">
+                    Continuar
+                </button>
+            </div>
+
+            <!-- Paso 2: Autenticación -->
+            <div id="step-auth" class="step-transition hidden">
+                <button onclick="goBack('step-level')" class="text-sm text-[#27316A] hover:text-[#E85A14] mb-4 flex items-center transition-colors">
+                    ← Volver
+                </button>
+                <h2 class="text-xl font-semibold text-gray-800 mb-2">Verificación de Usuario</h2>
+                <p id="auth-subtitle" class="text-gray-600 mb-4 text-sm">Ingresa tu correo institucional para verificar tu identidad.</p>
+                
+                <div class="space-y-4">
+                    <label class="block text-sm font-medium text-gray-700">Correo</label>
+                    <input type="email" id="student-email" placeholder="ejemplo: alumno@cgb.mx" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#27316A] outline-none transition">
+                    <p id="hint-emails" class="text-xs text-gray-400 mt-1 italic">
+                        Correos de prueba: alumno.pa@cgb.mx, alumno.sec@cgb.mx, alumno.prepa@cgb.mx, staff@cgb.mx
+                    </p>
+                    <p id="email-error" class="text-red-500 text-xs mt-1 hidden"></p>
+                </div>
+                
+                <button onclick="verifyEmail()" class="mt-8 w-full bg-[#E85A14] hover:bg-[#cc4d0e] text-white font-semibold py-3 px-4 rounded-lg shadow transition duration-200">
+                    Verificar y Entrar
+                </button>
+            </div>
+
+            <!-- Paso 3: EVALUACIÓN -->
+            <div id="step-evaluation" class="step-transition hidden">
+                <button onclick="goBack('step-level')" class="text-sm text-[#27316A] hover:text-[#E85A14] mb-4 flex items-center transition-colors">
+                    ← Volver al inicio
+                </button>
+                <div class="flex justify-between items-center mb-4 border-b pb-3">
+                    <h2 class="text-xl font-semibold text-gray-800">Cuestionario</h2>
+                    <span id="user-badge" class="bg-[#27316A]/10 text-[#27316A] text-xs font-semibold px-2.5 py-0.5 rounded-full border border-[#27316A]/20"></span>
+                </div>
+
+                <div id="dynamic-welcome" class="mb-5 text-sm"></div>
+                
+                <div class="space-y-5">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Selecciona al docente a evaluar:</label>
+                        <select id="teacher-select" onchange="resetNotMyTeacher()" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#27316A] outline-none">
+                            <option value="">-- Elige un profesor --</option>
+                        </select>
+                    </div>
+
+                    <div id="not-my-teacher-container" class="bg-orange-50 border border-orange-200 p-3 rounded-lg flex items-center hidden">
+                        <input type="checkbox" id="not-my-teacher" onchange="toggleQuestions()" class="h-5 w-5 text-[#E85A14] rounded focus:ring-[#E85A14] border-gray-300">
+                        <label for="not-my-teacher" class="ml-3 text-sm font-semibold text-gray-800 cursor-pointer select-none">
+                            Este maestro NO me da clase (Saltar)
+                        </label>
+                    </div>
+
+                    <div id="evaluation-body" class="space-y-5 transition-opacity duration-300 hidden">
+                        <div id="questions-container" class="space-y-6"></div>
+                    </div>
+                </div>
+                
+                <button id="submit-btn" onclick="submitEvaluation()" class="mt-8 w-full bg-[#27316A] hover:bg-[#1a214d] text-white font-semibold py-3 px-4 rounded-lg shadow transition duration-200 hidden">
+                    Enviar Mis Respuestas
+                </button>
+            </div>
+
+            <!-- Paso 4: DASHBOARD ADMIN -->
+            <div id="step-dashboard" class="step-transition hidden">
+                <div class="flex justify-between items-center mb-6 border-b pb-3">
+                    <div>
+                        <h2 class="text-2xl font-bold text-[#27316A]">Panel de Análisis Académico</h2>
+                        <p class="text-xs text-[#E85A14] font-semibold tracking-wide italic">Gestión: L.I.E. Arturo Palacios González</p>
+                    </div>
+                    <button onclick="goBack('step-level')" class="text-sm text-gray-500 hover:text-[#CE1126] flex items-center gap-1 font-medium transition-colors">
+                        Salir
+                    </button>
+                </div>
+
+                <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-6 flex flex-col sm:flex-row gap-4">
+                    <div class="flex-1">
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Sección</label>
+                        <select id="filter-level" onchange="handleLevelFilterChange()" class="w-full p-2.5 text-sm border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-[#E85A14] outline-none cursor-pointer">
+                            <option value="todos">Todos los Niveles</option>
+                            <option value="primaria_baja">Primaria Baja</option>
+                            <option value="primaria_alta">Primaria Alta</option>
+                            <option value="secundaria">Secundaria</option>
+                            <option value="bachillerato">Bachillerato</option>
+                        </select>
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Grado y Grupo</label>
+                        <select id="filter-group" onchange="updateDashboard()" class="w-full p-2.5 text-sm border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-[#E85A14] outline-none cursor-pointer">
+                            <option value="todos">Todos los Grupos</option>
+                        </select>
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Docente</label>
+                        <select id="filter-teacher" onchange="updateDashboard()" class="w-full p-2.5 text-sm border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-[#E85A14] outline-none cursor-pointer bg-blue-50">
+                            <option value="todos">Todos los Docentes</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-l-4 border-l-[#27316A]">
+                        <p class="text-xs text-gray-500 font-semibold uppercase">Evaluaciones</p>
+                        <p id="metric-total" class="text-2xl font-bold text-gray-800 mt-1">0</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-l-4 border-l-[#E85A14]">
+                        <p class="text-xs text-gray-500 font-semibold uppercase">Grupos</p>
+                        <p id="metric-groups" class="text-2xl font-bold text-gray-800 mt-1">0</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-l-4 border-l-green-500">
+                        <p class="text-xs text-gray-500 font-semibold uppercase">Percepciones (+)</p>
+                        <p id="metric-positive" class="text-2xl font-bold text-gray-800 mt-1">0</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-l-4 border-l-[#CE1126]">
+                        <p class="text-xs text-gray-500 font-semibold uppercase">Oportunidad (-)</p>
+                        <p id="metric-negative" class="text-2xl font-bold text-gray-800 mt-1">0</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                        <h3 class="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">📊 Votos por Grupo</h3>
+                        <div class="relative h-56 w-full"><canvas id="barChart"></canvas></div>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col items-center">
+                        <h3 class="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">🎯 Percepción Global</h3>
+                        <div class="relative h-48 w-full max-w-[220px]"><canvas id="sentimentChart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div id="custom-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center hidden z-50 px-4">
+        <div class="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full text-center">
+            <div id="modal-icon" class="mx-auto flex items-center justify-center h-12 w-12 rounded-full mb-4"></div>
+            <h3 id="modal-title" class="text-lg font-bold text-gray-900 mb-2"></h3>
+            <p id="modal-message" class="text-sm text-gray-500 mb-6"></p>
+            <button onclick="closeModal()" id="modal-btn" class="w-full rounded-md px-4 py-2 font-bold text-white bg-[#27316A]">Entendido</button>
+        </div>
+    </div>
+
+    <script>
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwlyv0QGKTG4fZjuN7fk0yHwRezYClPrNC1Zi-B2tUWVIj2d7iNNa8ot1sd67mcov8F/exec'; 
+        let currentLevel = '', currentEmail = '', activeDatabase = [];
+
+        // --- MOCK LOCAL PARA EL PROTOTIPO ---
+        const localDirectory = {
+            "admin@cgb.mx": { level: "admin", completed: false },
+            "arturo@cgb.mx": { level: "admin", completed: false }
+        };
+
+        // (Lógica de JS simplificada para brevedad)
+        async function fetchAPI(action, dataObj = null) {
+            // Simulador de API
+            return { valid: true, user: { level: "admin" } };
+        }
+
+        async function processLevel() {
+            currentLevel = document.getElementById('school-level').value;
+            hideAllSteps();
+            if (currentLevel === 'admin') {
+                document.getElementById('step-auth').classList.remove('hidden');
+            } else {
+                document.getElementById('step-evaluation').classList.remove('hidden');
+            }
+        }
+
+        async function verifyEmail() {
+            hideAllSteps();
+            document.getElementById('step-dashboard').classList.remove('hidden');
+        }
+
+        function hideAllSteps() {
+            document.getElementById('step-level').classList.add('hidden');
+            document.getElementById('step-auth').classList.add('hidden');
+            document.getElementById('step-evaluation').classList.add('hidden');
+            document.getElementById('step-dashboard').classList.add('hidden');
+        }
+
+        function goBack(id) {
+            hideAllSteps();
+            document.getElementById(id).classList.remove('hidden');
+        }
+        
+        function closeModal() { document.getElementById('custom-modal').classList.add('hidden'); }
+    </script>
+</body>
+</html>
