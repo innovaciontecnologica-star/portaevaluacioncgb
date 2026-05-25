@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal de Evaluación - CGB</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        primary: '#1e40af', 
+                        secondary: '#3b82f6',
+                        accent: '#f59e0b'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .toast-enter { animation: toastSlideIn 0.3s forwards; }
+        .toast-exit { animation: toastSlideOut 0.3s forwards; }
+        @keyframes toastSlideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        @keyframes toastSlideOut { from { transform: translateX(0); } to { transform: translateX(100%); } }
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.5) rotate(-20deg); }
+            100% { opacity: 1; transform: scale(1) rotate(-12deg); }
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col text-slate-800">
+
+    <header class="bg-primary text-white shadow-md z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <i class="fas fa-graduation-cap text-2xl text-accent"></i>
+                <div class="flex items-baseline">
+                    <h1 class="font-bold text-xl tracking-tight">CGB Evalúa</h1>
+                    <span class="text-[10px] bg-blue-800 text-blue-200 px-1.5 py-0.5 rounded ml-2 font-mono uppercase tracking-wide">v1.0</span>
+                </div>
+            </div>
+            <div id="user-info" class="hidden flex items-center gap-4">
+                <span id="header-role" class="text-sm bg-blue-800 px-3 py-1 rounded-full font-medium"></span>
+                <span id="header-email" class="text-sm hidden sm:block"></span>
+                <button onclick="app.logout()" class="text-sm hover:text-red-300 transition-colors">
+                    <i class="fas fa-sign-out-alt mr-1"></i> Salir
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main id="app-container" class="flex-grow overflow-y-auto p-4 sm:p-6 lg:p-8 relative">
+    </main>
+
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2"></div>
+
+    <script>
+        // =====================================================================
+        // --- CONFIGURACIÓN DE GOOGLE SHEETS ---
+        // PEGA AQUÍ TU NUEVA URL GENERADA EN GOOGLE APPS SCRIPT:
+        // =====================================================================
+        const GOOGLE_SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbzURUJkqQoSBEH_mFxYIRvY8g2skF26v3dw0IG6VW0FBGQdSzvDMbgaq18S3Fip1tSR/exec'; 
+
+        // --- DATOS GLOBALES ---
+        let appTeachers = []; 
+        let appEmails = [];   
+        
+        // --- PLAN B (MOCK DATA) ---
+        const FALLBACK_TEACHERS = [
+            { id: 1, name: "Ana Martínez", gender: "F", levels: ['primaria_baja', 'primaria_alta'] },
+            { id: 2, name: "Carlos López", gender: "M", levels: ['primaria_alta'] },
+            { id: 3, name: "María Fernández", gender: "F", levels: ['secundaria', 'bachillerato'] },
+            { id: 4, name: "Roberto Gómez", gender: "M", levels: ['secundaria'] },
+            { id: 5, name: "Elena Rojas", gender: "F", levels: ['bachillerato'] },
+            { id: 6, name: "Laura Sánchez", gender: "F", levels: ['personal_cgb'] }
+        ];
+
+        const SUBJECT_OPTIONS_BAJA = [
+            { label: 'Español', emoji: '📖' },
+            { label: 'Inglés', emoji: '🗣️' },
+            { label: 'Cultura Física', emoji: '⚽' },
+            { label: 'Música', emoji: '🎵' },
+            { label: 'Arte', emoji: '🎨' }
+        ];
+
+        const SUBJECT_OPTIONS_ALTA = [
+            { label: 'Español', emoji: '📖' },
+            { label: 'Inglés', emoji: '🗣️' },
+            { label: 'Cultura Física', emoji: '⚽' },
+            { label: 'Música', emoji: '🎵' },
+            { label: 'Escultura', emoji: '🗿' },
+            { label: 'Baile', emoji: '🩰' },
+            { label: 'Teatro', emoji: '🎭' }
+        ];
+
+        const MOCK_QUESTIONS = {
+            primaria_baja: [
+                { type: 'faces', text: "1. Sí le entiendo a su clase y cuando me cuesta trabajo, me explica." },
+                { type: 'faces', text: "2. La tarea que me deja se me hace fácil porque ya lo vi en clase." },
+                { type: 'faces', text: "3. Sí me alcanza el tiempo para hacer la tarea." },
+                { type: 'faces', text: "4. Califica los trabajos y tareas." },
+                { type: 'faces', text: "5. Siempre está conmigo en el salón y me acompaña a mis actividades." },
+                { type: 'faces', text: "6. Hacemos muchas cosas diferentes en la clase y me gustan." },
+                { type: 'faces', text: "7. Me trata siempre con respeto." },
+                { type: 'faces', text: "8. Me dice lo que tengo que estudiar más para mejorar y cómo voy en clase." },
+                { type: 'faces', text: "9. Me invita a vivir los valores de honestidad, respeto, amistad, justicia y compromiso." },
+                { type: 'subjects', text: "10. La clase que más me gusta es:", isGeneral: true, options: SUBJECT_OPTIONS_BAJA },
+                { type: 'subjects', text: "11. La clase que no me gusta mucho es:", isGeneral: true, options: SUBJECT_OPTIONS_BAJA },
+                { type: 'textarea', text: "12. Escribe algo que le quieras decir a uno de tus maestros.", isGeneral: true }
+            ],
+            primaria_alta: [
+                { type: 'faces', text: "1. Sí le entiendo a su clase y cuando me cuesta trabajo, me explica." },
+                { type: 'faces', text: "2. La tarea que me deja se me hace fácil porque ya lo vi en clase." },
+                { type: 'faces', text: "3. Sí me alcanza el tiempo para hacer la tarea." },
+                { type: 'faces', text: "4. Califica los trabajos y tareas." },
+                { type: 'faces', text: "5. Siempre está conmigo en el salón y me acompaña a mis actividades." },
+                { type: 'faces', text: "6. Hacemos muchas cosas diferentes en la clase y me gustan." },
+                { type: 'faces', text: "7. Me trata siempre con respeto." },
+                { type: 'faces', text: "8. Me dice lo que tengo que estudiar más para mejorar y cómo voy en clase." },
+                { type: 'faces', text: "9. Me invita a vivir los valores de honestidad, respeto, amistad, justicia y compromiso." },
+                { type: 'subjects', text: "10. La clase que más me gusta es:", isGeneral: true, options: SUBJECT_OPTIONS_ALTA },
+                { type: 'subjects', text: "11. La clase que no me gusta mucho es:", isGeneral: true, options: SUBJECT_OPTIONS_ALTA },
+                { type: 'textarea', text: "12. Escribe algo que le quieras decir a uno de tus maestros.", isGeneral: true }
+            ],
+            secundaria: [
+                "El docente domina los temas de la asignatura.",
+                "Fomenta la participación activa y el pensamiento crítico.",
+                "Utiliza herramientas y recursos didácticos variados.",
+                "La evaluación es justa y acorde a lo enseñado.",
+                "El trato es respetuoso y fomenta un buen ambiente."
+            ],
+            bachillerato: [
+                "Demuestra un alto nivel de dominio en su disciplina.",
+                "Promueve el análisis, la investigación y el debate en clase.",
+                "Proporciona retroalimentación útil y oportuna en los trabajos.",
+                "Las metodologías empleadas son adecuadas para el nivel.",
+                "Muestra disposición para asesorías y resolución de dudas."
+            ],
+            personal_cgb: [
+                "¿Muestra liderazgo y organización en sus actividades?",
+                "¿La comunicación con el equipo de trabajo es efectiva?",
+                "¿Cumple con los objetivos y tiempos establecidos?",
+                "¿Fomenta un clima laboral positivo y colaborativo?"
+            ]
+        };
+
+        let MOCK_SUBMISSIONS = [];
+
+        // --- ESTADO DE LA APLICACIÓN ---
+        const app = {
+            currentUser: null,
+            currentView: 'login',
+            selectedTeacher: null,
+            hasAnsweredGeneralQuestions: false, 
+            hiddenTeachers: [],
+            evaluatedTeachers: [],
+            showCompletionCelebration: false,
+            hasSeenCelebration: false,
+            adminFilterLevel: 'todos',
+
+            async init() {
+                await this.fetchInitialData();
+                this.render();
+            },
+
+            async fetchInitialData() {
+                if (!GOOGLE_SHEETS_API_URL) {
+                    console.log("Modo local (Sin URL de Sheets).");
+                    appTeachers = FALLBACK_TEACHERS;
+                    appEmails = []; 
+                    return;
+                }
+                try {
+                    const response = await fetch(GOOGLE_SHEETS_API_URL + "?action=getInitialData");
+                    const data = await response.json();
+                    if (data && data.teachers) {
+                        appTeachers = data.teachers;
+                        appEmails = data.emails || [];
+                    } else {
+                        throw new Error("Formato incorrecto");
+                    }
+                } catch (error) {
+                    console.error("Error Sheets:", error);
+                    showToast("Error de conexión. Usando datos locales.", "error");
+                    appTeachers = FALLBACK_TEACHERS;
+                }
+            },
+
+            navigate(view) {
+                this.currentView = view;
+                this.render();
+            },
+
+            setAdminFilterLevel(level) {
+                this.adminFilterLevel = level;
+                this.renderAdminCharts();
+            },
+
+            toggleTeacher(id) {
+                if (this.hiddenTeachers.includes(id)) {
+                    this.hiddenTeachers = this.hiddenTeachers.filter(tId => tId !== id);
+                } else {
+                    this.hiddenTeachers.push(id);
+                }
+                this.render();
+            },
+
+            logout() {
+                this.currentUser = null;
+                this.selectedTeacher = null;
+                this.hasAnsweredGeneralQuestions = false; 
+                this.hiddenTeachers = []; 
+                this.evaluatedTeachers = []; 
+                this.showCompletionCelebration = false;
+                this.hasSeenCelebration = false;
+                document.getElementById('user-info').classList.add('hidden');
+                this.navigate('login');
+                showToast('Sesión cerrada correctamente', 'info');
+            },
+
+            closeCelebration() {
+                this.showCompletionCelebration = false;
+                this.render();
+            },
+
+            render() {
+                const container = document.getElementById('app-container');
+                container.innerHTML = '';
+
+                switch(this.currentView) {
+                    case 'login': container.innerHTML = this.views.login(); break;
+                    case 'portal': container.innerHTML = this.views.portal(); break;
+                    case 'form': container.innerHTML = this.views.form(); break;
+                    case 'admin': container.innerHTML = this.views.admin(); this.fetchAdminData(); break;
+                }
+
+                window.scrollTo(0, 0);
+
+                const userInfo = document.getElementById('user-info');
+                if (this.currentUser) {
+                    userInfo.classList.remove('hidden');
+                    const roleNames = {
+                        'primaria_baja': 'Primaria Baja', 'primaria_alta': 'Primaria Alta',
+                        'secundaria': 'Secundaria', 'bachillerato': 'Bachillerato',
+                        'personal_cgb': 'Personal CGB', 'admin': 'Administrador'
+                    };
+                    document.getElementById('header-role').innerText = roleNames[this.currentUser.role] || this.currentUser.role;
+                    document.getElementById('header-email').innerText = this.currentUser.email || '';
+                } else {
+                    userInfo.classList.add('hidden');
+                }
+            },
+
+            views: {
+                login: () => `
+                    <div class="max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden fade-in mt-10">
+                        <div class="bg-primary p-6 text-center text-white">
+                            <i class="fas fa-user-circle text-5xl mb-3"></i>
+                            <h2 class="text-2xl font-bold">Ingreso al Portal</h2>
+                            <p class="text-blue-200 text-sm mt-1">Selecciona tu perfil para continuar</p>
+                        </div>
+                        <div class="p-6">
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Perfil de Usuario</label>
+                                <select id="login-role" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary p-2.5 border outline-none bg-white" onchange="app.handleRoleChange()">
+                                    <option value="" disabled selected>Selecciona un perfil...</option>
+                                    <option value="primaria_baja">Primaria Baja</option>
+                                    <option value="primaria_alta">Primaria Alta</option>
+                                    <option value="secundaria">Secundaria</option>
+                                    <option value="bachillerato">Bachillerato</option>
+                                    <option value="personal_cgb">Personal CGB</option>
+                                    <option value="admin">Administrador (Dashboard)</option>
+                                </select>
+                            </div>
+                            
+                            <div id="email-container" class="mb-6 hidden">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Correo Institucional</label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <i class="fas fa-envelope text-gray-400"></i>
+                                    </div>
+                                    <input type="email" id="login-email" placeholder="tu.nombre@cgb.edu.mx" class="w-full pl-10 border-gray-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary p-2.5 border outline-none">
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Requerido para verificación.</p>
+                            </div>
+
+                            <button onclick="app.processLogin()" class="w-full bg-primary hover:bg-blue-800 text-white font-semibold py-2.5 rounded-lg shadow transition-colors">
+                                Ingresar <i class="fas fa-arrow-right ml-2"></i>
+                            </button>
+                        </div>
+                    </div>
+                `,
+
+                portal: () => {
+                    const role = app.currentUser.role;
+                    const availableTeachers = appTeachers.filter(t => t.levels.includes(role));
+
+                    let html = `
+                        <div class="max-w-5xl mx-auto fade-in">
+                            <div class="mb-8">
+                                <h2 class="text-3xl font-bold text-gray-800">Personal a Evaluar</h2>
+                                <p class="text-gray-600 mt-1">Apaga el switch de los maestros que no te dan clases. Selecciona a los demás para evaluarlos.</p>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    `;
+
+                    if (availableTeachers.length === 0) {
+                        html += `<div class="col-span-full p-8 text-center bg-white rounded-xl border border-gray-200">
+                                    <i class="fas fa-folder-open text-4xl text-gray-300 mb-3"></i>
+                                    <p class="text-gray-500">No hay personal asignado para evaluar en este nivel.</p>
+                                 </div>`;
+                    }
+
+                    availableTeachers.forEach(teacher => {
+                        const avatarEmoji = teacher.gender === 'F' ? '👩‍🏫' : '👨‍🏫';
+                        const isHidden = app.hiddenTeachers.includes(teacher.id); 
+                        const isEvaluated = app.evaluatedTeachers.includes(teacher.id); 
+                        
+                        let cardClasses = 'bg-white rounded-xl shadow-sm border transition-all p-5 flex flex-col items-center text-center group relative overflow-hidden ';
+                        if (isEvaluated) {
+                            cardClasses += 'border-green-300 bg-green-50';
+                        } else if (isHidden) {
+                            cardClasses += 'border-gray-200 bg-gray-50 opacity-75';
+                        } else {
+                            cardClasses += 'border-gray-100 hover:shadow-md hover:border-blue-200';
+                        }
+                        
+                        html += `
+                            <div class="${cardClasses}">
+                                
+                                ${isEvaluated ? `
+                                <div class="absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-[1px] rounded-xl animate-[fadeIn_0.5s_ease-out]">
+                                    <div class="transform -rotate-12 bg-green-500 text-white font-bold py-2 px-6 rounded-lg shadow-lg border-2 border-white text-xl" style="animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;">
+                                        <i class="fas fa-check-circle mr-1"></i> ¡EVALUADO!
+                                    </div>
+                                </div>
+                                ` : ''}
+
+                                <div class="w-full flex justify-between items-center bg-gray-50 px-3 py-2 rounded-lg mb-4 border border-gray-100 relative z-0">
+                                    <span class="text-xs font-medium ${isHidden ? 'text-gray-400' : 'text-gray-700'}">Sí me da clases</span>
+                                    <label class="flex items-center ${isEvaluated ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}">
+                                        <div class="relative">
+                                            <input type="checkbox" class="sr-only peer" ${!isHidden ? 'checked' : ''} ${isEvaluated ? 'disabled' : ''} onchange="app.toggleTeacher(${teacher.id})">
+                                            <div class="block bg-gray-300 peer-checked:bg-green-500 w-9 h-5 rounded-full transition-colors"></div>
+                                            <div class="dot absolute left-[2px] top-[2px] bg-white w-4 h-4 rounded-full transition-transform peer-checked:translate-x-4 shadow-sm"></div>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                <div class="w-20 h-20 ${isHidden ? 'bg-gray-100' : 'bg-blue-50'} border ${isHidden ? 'border-gray-200' : 'border-blue-100'} rounded-full flex items-center justify-center text-5xl mb-3 ${isHidden || isEvaluated ? '' : 'group-hover:scale-110 cursor-pointer'} transition-transform shadow-sm relative z-0" ${isHidden || isEvaluated ? '' : `onclick="app.startEvaluation(${teacher.id})"`}>
+                                    <span class="${isHidden ? 'grayscale opacity-50' : ''}">${avatarEmoji}</span>
+                                </div>
+                                <h3 class="font-semibold text-lg ${isHidden ? 'text-gray-400 line-through' : 'text-gray-800'} relative z-0">${teacher.name}</h3>
+                                <div class="flex gap-1 mt-2 flex-wrap justify-center relative z-0">
+                                    ${teacher.levels.map(l => `<span class="text-xs ${isHidden ? 'bg-gray-200 text-gray-400' : 'bg-gray-100 text-gray-600'} px-2 py-1 rounded-full">${l.replace('_', ' ')}</span>`).join('')}
+                                </div>
+                                
+                                <div class="w-full mt-4 relative z-0">
+                                ${isEvaluated ? 
+                                    `<button disabled class="w-full bg-green-100 text-green-700 py-2 rounded-lg text-sm font-bold cursor-not-allowed border border-green-200">Completado</button>`
+                                : isHidden ? 
+                                    `<button disabled class="w-full bg-gray-200 text-gray-400 py-2 rounded-lg text-sm font-medium cursor-not-allowed">Omitido</button>` 
+                                : 
+                                    `<button onclick="app.startEvaluation(${teacher.id})" class="w-full bg-blue-50 text-primary hover:bg-primary hover:text-white py-2 rounded-lg text-sm font-medium transition-colors">Evaluar</button>`
+                                }
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    html += `</div>`; 
+
+                    if (app.showCompletionCelebration) {
+                        html += `
+                            <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/80 backdrop-blur-sm fade-in">
+                                <div class="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full text-center relative mx-4" style="animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;">
+                                    <h2 class="text-3xl font-extrabold text-green-600 mb-2">¡Misión Cumplida!</h2>
+                                    <p class="text-gray-600 mb-6 font-medium">Has completado todas tus evaluaciones.</p>
+                                    
+                                    <div class="w-48 h-48 mx-auto mb-6 flex justify-center items-center">
+                                        <img src="./dragon_apuntando.png" alt="BRETAX la mascota" class="w-full h-full object-contain drop-shadow-xl" onerror="this.src='https://placehold.co/200x200/e2e8f0/64748b?text=BRETAX'">
+                                    </div>
+                                    
+                                    <button onclick="app.closeCelebration()" class="w-full bg-primary hover:bg-blue-800 text-white font-bold py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-0.5">
+                                        <i class="fas fa-check-circle mr-2"></i> ¡Entendido!
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    html += `</div>`; 
+                    return html;
+                },
+
+                form: () => {
+                    const teacher = appTeachers.find(t => t.id === app.selectedTeacher);
+                    const questions = MOCK_QUESTIONS[app.currentUser.role];
+                    const isPrimaria = ['primaria_baja', 'primaria_alta'].includes(app.currentUser.role);
+                    
+                    let html = `
+                        <div class="max-w-3xl mx-auto fade-in">
+                            <button onclick="app.navigate('portal')" class="text-gray-500 hover:text-primary mb-4 flex items-center gap-2 transition-colors">
+                                <i class="fas fa-arrow-left"></i> Volver a la lista
+                            </button>
+                            
+                            <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+                                <div class="bg-gradient-to-r from-primary to-secondary p-6 text-white flex justify-between items-end">
+                                    <div>
+                                        <p class="text-blue-100 text-sm mb-1 uppercase tracking-wide font-semibold">Evaluación Docente</p>
+                                        <h2 class="text-2xl font-bold">${teacher.name}</h2>
+                                        ${isPrimaria ? '<p class="text-blue-100 text-xs mt-2 opacity-80">Desde la mirada del estudiante de Primaria - 25-26B</p>' : ''}
+                                    </div>
+                                    <i class="fas fa-clipboard-list text-4xl opacity-50"></i>
+                                </div>
+                                
+                                <form id="evaluation-form" class="p-6 sm:p-8" onsubmit="event.preventDefault(); app.submitEvaluation();">
+                    `;
+
+                    if (isPrimaria && app.hasAnsweredGeneralQuestions) {
+                        html += `
+                            <div class="mb-6 p-4 bg-green-50 border border-green-200 text-green-700 rounded-xl text-sm flex items-start gap-3">
+                                <i class="fas fa-check-circle mt-0.5 text-lg"></i>
+                                <p>Ya guardamos tus respuestas sobre tus materias favoritas en la evaluación anterior. ¡Solo evalúa a <strong>${teacher.name}</strong>!</p>
+                            </div>
+                        `;
+                    }
+
+                    questions.forEach((q, index) => {
+                        if (typeof q === 'object' && q.isGeneral && app.hasAnsweredGeneralQuestions) {
+                            return; 
+                        }
+
+                        let qText = typeof q === 'string' ? `${index + 1}. ${q}` : q.text;
+
+                        html += `
+                            <div class="mb-8 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                <p class="font-medium text-gray-800 mb-4">${qText}</p>
+                                <div class="flex flex-wrap gap-4">
+                        `;
+                        
+                        if (typeof q === 'object' && q.type === 'faces') {
+                             const faces = [
+                                { val: 3, emoji: '😀', label: 'Excelente' },
+                                { val: 2, emoji: '😐', label: 'Regular' },
+                                { val: 1, emoji: '🙁', label: 'Malo' }
+                             ];
+                             faces.forEach(f => {
+                                 html += `
+                                    <label class="cursor-pointer flex flex-col items-center gap-2 p-3 bg-white border border-gray-200 rounded-lg hover:border-primary hover:bg-blue-50 transition-colors flex-1 text-center">
+                                        <input type="radio" name="q${index}" value="${f.val}" required class="hidden peer">
+                                        <span class="text-4xl peer-checked:scale-125 transition-transform origin-center inline-block">${f.emoji}</span>
+                                        <span class="text-sm font-medium text-gray-600">${f.label}</span>
+                                        <div class="w-full h-1 bg-transparent peer-checked:bg-primary rounded-full mt-1"></div>
+                                    </label>
+                                 `;
+                             });
+                        } else if (typeof q === 'object' && q.type === 'subjects') {
+                             html += `<div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 w-full">`;
+                             q.options.forEach(opt => {
+                                 html += `
+                                    <label class="cursor-pointer flex flex-col items-center gap-2 p-2 bg-white border border-gray-200 rounded-lg hover:border-primary hover:bg-blue-50 transition-colors text-center w-full">
+                                        <input type="radio" name="q${index}" value="${opt.label}" required class="hidden peer">
+                                        <span class="text-2xl peer-checked:scale-125 transition-transform origin-center inline-block">${opt.emoji}</span>
+                                        <span class="text-[10px] font-medium text-gray-600 leading-tight">${opt.label}</span>
+                                        <div class="w-full h-1 bg-transparent peer-checked:bg-primary rounded-full mt-1"></div>
+                                    </label>
+                                 `;
+                             });
+                             html += `</div>`;
+                        } else if (typeof q === 'object' && q.type === 'select') {
+                            html += `
+                                <select name="q${index}" required class="w-full border-gray-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary p-3 border outline-none bg-white">
+                                    <option value="" disabled selected>Selecciona una opción...</option>
+                                    ${q.options.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
+                                </select>
+                            `;
+                        } else if (typeof q === 'object' && q.type === 'textarea') {
+                            html += `
+                                <textarea name="q${index}" rows="3" required class="w-full border-gray-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary p-3 border outline-none resize-none" placeholder="Escribe tu respuesta aquí..."></textarea>
+                            `;
+                        } else {
+                            for(let i=1; i<=5; i++) {
+                                html += `
+                                    <label class="cursor-pointer flex items-center justify-center w-12 h-12 bg-white border border-gray-300 rounded-full hover:bg-blue-50 hover:border-primary transition-colors text-gray-600 font-bold peer-checked:bg-primary peer-checked:text-white">
+                                        <input type="radio" name="q${index}" value="${i}" required class="peer hidden">
+                                        ${i}
+                                    </label>
+                                `;
+                            }
+                            html += `<div class="w-full flex justify-between text-xs text-gray-500 mt-1 px-1"><span>1 - Totalmente en desacuerdo</span> <span>5 - Totalmente de acuerdo</span></div>`;
+                        }
+                        
+                        html += `</div></div>`;
+                    });
+
+                    if (!isPrimaria) {
+                        html += `
+                                    <div class="mb-6">
+                                        <label class="block font-medium text-gray-800 mb-2">Comentarios adicionales (Opcional)</label>
+                                        <textarea id="eval-comments" rows="3" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary p-3 border outline-none resize-none" placeholder="Escribe aquí si tienes algún comentario..."></textarea>
+                                    </div>`;
+                    }
+
+                    html += `
+                                    <button type="submit" class="w-full bg-primary hover:bg-blue-800 text-white font-bold py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-0.5">
+                                        <i class="fas fa-paper-plane mr-2"></i> Enviar Evaluación
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    `;
+                    return html;
+                },
+
+                admin: () => {
+                    const filters = [
+                        { id: 'todos', label: 'Todos' },
+                        { id: 'primaria_baja', label: 'Primaria Baja' },
+                        { id: 'primaria_alta', label: 'Primaria Alta' },
+                        { id: 'secundaria', label: 'Secundaria' },
+                        { id: 'bachillerato', label: 'Bachillerato' },
+                        { id: 'personal_cgb', label: 'Personal CGB' }
+                    ];
+
+                    const filterButtons = filters.map(f => `
+                        <button onclick="app.setAdminFilterLevel('${f.id}')" 
+                                class="px-5 py-2 rounded-full text-sm font-semibold whitespace-nowrap shadow-sm transition-all duration-200 
+                                ${app.adminFilterLevel === f.id ? 'bg-primary text-white scale-105 shadow-md' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 hover:border-gray-300'}">
+                            ${f.label}
+                        </button>
+                    `).join('');
+
+                    return `
+                        <div class="max-w-7xl mx-auto fade-in">
+                            <div class="flex justify-between items-center mb-6 flex-wrap gap-4">
+                                <div>
+                                    <h2 class="text-3xl font-bold text-gray-800">Dashboard de Administración</h2>
+                                    <p class="text-gray-600">Resumen en tiempo real del proceso de evaluación.</p>
+                                </div>
+                                <button onclick="app.exportToCSV()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium shadow flex items-center gap-2 transition-colors">
+                                    <i class="fas fa-file-excel"></i> Exportar Datos
+                                </button>
+                            </div>
+
+                            <div class="mb-8 bg-gray-50 p-4 rounded-2xl border border-gray-100 shadow-inner">
+                                <div class="flex items-center gap-2 mb-3">
+                                    <i class="fas fa-filter text-gray-400"></i>
+                                    <h3 class="text-sm font-bold text-gray-600 uppercase tracking-wider">Filtrar por Nivel Educativo</h3>
+                                </div>
+                                <div class="flex gap-3 overflow-x-auto pb-2" style="scrollbar-width: none;">
+                                    ${filterButtons}
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
+                                    <div class="w-14 h-14 bg-blue-100 text-primary rounded-xl flex items-center justify-center text-2xl">
+                                        <i class="fas fa-clipboard-check"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-500 text-sm font-medium">Evaluaciones Totales</p>
+                                        <p class="text-3xl font-bold text-gray-800" id="admin-total-evals">0</p>
+                                    </div>
+                                </div>
+                                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
+                                    <div class="w-14 h-14 bg-green-100 text-green-600 rounded-xl flex items-center justify-center text-2xl">
+                                        <i class="fas fa-users"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-500 text-sm font-medium">Personal Evaluado</p>
+                                        <p class="text-3xl font-bold text-gray-800" id="admin-teachers-evaled">0</p>
+                                    </div>
+                                </div>
+                                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
+                                    <div class="w-14 h-14 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center text-2xl">
+                                        <i class="fas fa-star"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-500 text-sm font-medium">Promedio Global</p>
+                                        <p class="text-3xl font-bold text-gray-800" id="admin-avg-score">0.0</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-8">
+                                <div class="flex items-center gap-2 mb-4">
+                                    <i class="fas fa-chart-bar text-primary text-xl"></i>
+                                    <h3 class="font-bold text-gray-800 text-xl">Estadísticas por Pregunta</h3>
+                                </div>
+                                <div id="admin-question-stats"></div>
+                            </div>
+
+                            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                                <div class="px-6 py-4 border-b border-gray-100 bg-gray-50">
+                                    <h3 class="font-bold text-gray-800">Últimas Evaluaciones Recibidas</h3>
+                                </div>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr class="bg-white text-gray-500 text-sm border-b border-gray-100">
+                                                <th class="py-3 px-6 font-medium">Fecha</th>
+                                                <th class="py-3 px-6 font-medium">Nivel</th>
+                                                <th class="py-3 px-6 font-medium">Docente</th>
+                                                <th class="py-3 px-6 font-medium">Puntuación Media</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="admin-table-body" class="text-gray-700 text-sm">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            ${!GOOGLE_SHEETS_API_URL ? `
+                            <div class="mt-8 p-4 bg-yellow-50 text-yellow-800 rounded-xl text-sm border border-yellow-200">
+                                <i class="fas fa-exclamation-triangle mr-2"></i> <strong>Estás en modo de prueba local.</strong> Los datos no se están guardando en Google Sheets. Agrega tu URL en el código para activar la persistencia.
+                            </div>` : ''}
+                        </div>
+                    `;
+                }
+            },
+
+            handleRoleChange() {
+                const role = document.getElementById('login-role').value;
+                const emailContainer = document.getElementById('email-container');
+                
+                if (role && role !== 'primaria_baja') {
+                    emailContainer.classList.remove('hidden');
+                } else {
+                    emailContainer.classList.add('hidden');
+                }
+            },
+
+            processLogin() {
+                const role = document.getElementById('login-role').value;
+                const email = document.getElementById('login-email').value.trim().toLowerCase();
+
+                if (!role) {
+                    showToast('Por favor, selecciona un perfil.', 'error');
+                    return;
+                }
+
+                if (role !== 'primaria_baja' && !email) {
+                    showToast('El correo institucional es obligatorio para tu nivel.', 'error');
+                    return;
+                }
+                
+                if (role !== 'primaria_baja' && email && !email.includes('@')) {
+                    showToast('Por favor ingresa un correo válido.', 'error');
+                    return;
+                }
+
+                if (GOOGLE_SHEETS_API_URL && role !== 'primaria_baja' && role !== 'admin') {
+                    if (appEmails.length > 0 && !appEmails.includes(email)) {
+                        showToast('Correo no autorizado. Verifica con administración.', 'error');
+                        return;
+                    }
+                }
+
+                this.currentUser = { role, email: role === 'primaria_baja' ? 'Sin correo' : email };
+                showToast(`Bienvenido, perfil: ${role.replace('_', ' ')}`, 'success');
+                
+                if (role === 'admin') {
+                    this.navigate('admin');
+                } else {
+                    this.navigate('portal');
+                }
+            },
+
+            startEvaluation(teacherId) {
+                this.selectedTeacher = teacherId;
+                this.navigate('form');
+            },
+
+            async submitEvaluation() {
+                const form = document.getElementById('evaluation-form');
+                const formData = new FormData(form);
+                const commentsEl = document.getElementById('eval-comments');
+                const comments = commentsEl ? commentsEl.value : '';
+                
+                let scores = [];
+                let allResponses = {}; 
+                
+                for (let [key, value] of formData.entries()) {
+                    if(key.startsWith('q')) {
+                        const numValue = parseInt(value);
+                        if (!isNaN(numValue) && numValue > 0 && numValue <= 5) {
+                            scores.push(numValue);
+                        }
+                        allResponses[key] = value;
+                    }
+                }
+                
+                const avgScore = scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+                const teacher = appTeachers.find(t => t.id === this.selectedTeacher);
+
+                const payload = {
+                    timestamp: new Date().toISOString(),
+                    evaluatorRole: this.currentUser.role,
+                    evaluatorEmail: this.currentUser.email,
+                    teacherId: teacher.id,
+                    teacherName: teacher.name,
+                    scores: scores,
+                    allResponses: allResponses,
+                    averageScore: avgScore.toFixed(2),
+                    comments: comments
+                };
+
+                try {
+                    const btn = form.querySelector('button[type="submit"]');
+                    const originalBtnText = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Guardando...';
+                    btn.disabled = true;
+
+                    if (GOOGLE_SHEETS_API_URL) {
+                        const response = await fetch(GOOGLE_SHEETS_API_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                            body: JSON.stringify(payload)
+                        });
+                        const result = await response.json();
+                        if (result.status !== 'success') throw new Error("Error en Sheets");
+                    } else {
+                        await new Promise(r => setTimeout(r, 800));
+                    }
+
+                    MOCK_SUBMISSIONS.push(payload);
+                    this.evaluatedTeachers.push(this.selectedTeacher);
+
+                    if (['primaria_baja', 'primaria_alta'].includes(this.currentUser.role)) {
+                        this.hasAnsweredGeneralQuestions = true;
+
+                        const available = appTeachers.filter(t => t.levels.includes(this.currentUser.role));
+                        const active = available.filter(t => !this.hiddenTeachers.includes(t.id));
+                        const evaluatedActive = active.filter(t => this.evaluatedTeachers.includes(t.id));
+
+                        if (active.length > 0 && active.length === evaluatedActive.length && !this.hasSeenCelebration) {
+                            this.showCompletionCelebration = true;
+                            this.hasSeenCelebration = true;
+                        }
+                    }
+
+                    showToast('¡Evaluación guardada exitosamente!', 'success');
+                    this.selectedTeacher = null;
+                    this.navigate('portal');
+
+                } catch (error) {
+                    showToast('Error al guardar. Revisa tu conexión a internet.', 'error');
+                    console.error(error);
+                    form.querySelector('button[type="submit"]').innerHTML = originalBtnText;
+                    form.querySelector('button[type="submit"]').disabled = false;
+                }
+            },
+
+            async fetchAdminData() {
+                if (!GOOGLE_SHEETS_API_URL) {
+                    this.renderAdminCharts();
+                    return; 
+                }
+                try {
+                    const response = await fetch(GOOGLE_SHEETS_API_URL + "?action=getSubmissions");
+                    const data = await response.json();
+                    if (data && Array.isArray(data)) {
+                        MOCK_SUBMISSIONS = data; 
+                        this.renderAdminCharts(); 
+                    }
+                } catch(error) {
+                    console.error("Error al obtener evaluaciones de Sheets", error);
+                    this.renderAdminCharts(); 
+                }
+            },
+
+            renderAdminCharts() {
+                if (this.currentView !== 'admin') return;
+
+                let filteredData = MOCK_SUBMISSIONS;
+                if (this.adminFilterLevel !== 'todos') {
+                    filteredData = MOCK_SUBMISSIONS.filter(s => s.evaluatorRole === this.adminFilterLevel);
+                }
+
+                const totalEvals = filteredData.length;
+                document.getElementById('admin-total-evals').innerText = totalEvals;
+
+                if (totalEvals > 0) {
+                    const uniqueTeachers = new Set(filteredData.map(s => s.teacherId)).size;
+                    document.getElementById('admin-teachers-evaled').innerText = uniqueTeachers;
+
+                    const globalSum = filteredData.reduce((sum, s) => sum + parseFloat(s.averageScore), 0);
+                    const globalAvg = (globalSum / totalEvals).toFixed(1);
+                    document.getElementById('admin-avg-score').innerText = globalAvg + ' / 5.0';
+
+                    const tbody = document.getElementById('admin-table-body');
+                    const recentSubmissions = [...filteredData].reverse().slice(0, 10);
+                    
+                    tbody.innerHTML = recentSubmissions.map(s => {
+                        const date = new Date(s.timestamp).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute:'2-digit' });
+                        const scoreColor = s.averageScore >= 2.5 ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50';
+                        
+                        return `
+                            <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                <td class="py-3 px-6">${date}</td>
+                                <td class="py-3 px-6 capitalize"><span class="px-2 py-1 bg-gray-100 rounded text-xs">${s.evaluatorRole.replace('_', ' ')}</span></td>
+                                <td class="py-3 px-6 font-medium text-gray-800">${s.teacherName}</td>
+                                <td class="py-3 px-6">
+                                    <span class="px-2 py-1 rounded font-bold text-xs ${scoreColor}">
+                                        ${s.averageScore}
+                                    </span>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+
+                } else {
+                    document.getElementById('admin-teachers-evaled').innerText = "0";
+                    document.getElementById('admin-avg-score').innerText = "0.0 / 5.0";
+                    document.getElementById('admin-table-body').innerHTML = `
+                        <tr><td colspan="4" class="py-8 text-center text-gray-400">Aún no hay evaluaciones registradas para este filtro</td></tr>
+                    `;
+                }
+
+                let statsHtml = '';
+                if (this.adminFilterLevel === 'todos') {
+                    statsHtml = `
+                        <div class="p-8 text-center bg-white rounded-2xl border border-dashed border-gray-300 shadow-sm col-span-full">
+                            <i class="fas fa-chart-pie text-5xl mb-4 text-blue-200"></i>
+                            <h3 class="text-lg font-bold text-gray-700 mb-1">Selecciona un nivel para ver detalles</h3>
+                            <p class="text-gray-500 text-sm">Las estadísticas por pregunta requieren que filtres por un nivel específico, ya que cada nivel tiene un cuestionario distinto.</p>
+                        </div>
+                    `;
+                } else if (totalEvals === 0) {
+                     statsHtml = `
+                        <div class="p-8 text-center bg-white rounded-2xl border border-gray-100 shadow-sm col-span-full">
+                            <p class="text-gray-500 text-sm">Aún no hay respuestas para procesar estadísticas.</p>
+                        </div>
+                    `;
+                } else {
+                    const questions = MOCK_QUESTIONS[this.adminFilterLevel];
+                    statsHtml = `<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">`;
+
+                    questions.forEach((q, index) => {
+                        const qKey = `q${index}`;
+                        const qText = typeof q === 'string' ? `${index + 1}. ${q}` : q.text;
+                        const maxScore = (typeof q === 'object' && q.type === 'faces') ? 3 : 5;
+
+                        let responses = [];
+                        filteredData.forEach(sub => {
+                            let allResp = sub.allResponses;
+                            if (typeof allResp === 'string') {
+                                try { allResp = JSON.parse(allResp); } catch(e) { allResp = {}; }
+                            }
+                            if (allResp && allResp[qKey] !== undefined) {
+                                responses.push(allResp[qKey]);
+                            }
+                        });
+
+                        if (responses.length === 0) return;
+
+                        if (typeof q === 'object' && (q.type === 'subjects' || q.type === 'select')) {
+                            let tallies = {};
+                            responses.forEach(r => { tallies[r] = (tallies[r] || 0) + 1; });
+                            let topItem = Object.keys(tallies).sort((a,b) => tallies[b] - tallies[a])[0];
+                            let percent = Math.round((tallies[topItem] / responses.length) * 100);
+
+                            statsHtml += `
+                                <div class="bg-gradient-to-br from-blue-50 to-indigo-50 p-5 rounded-2xl border border-blue-100 shadow-sm flex flex-col justify-between">
+                                    <div>
+                                        <div class="flex items-center gap-2 mb-2">
+                                            <i class="fas fa-trophy text-accent"></i>
+                                            <p class="text-xs text-blue-600 font-bold uppercase tracking-wide">Tendencia Principal</p>
+                                        </div>
+                                        <p class="font-medium text-gray-800 text-sm mb-4 line-clamp-2">${qText}</p>
+                                    </div>
+                                    <div class="flex items-end gap-2">
+                                        <span class="text-2xl font-black text-primary leading-none">${topItem}</span>
+                                        <span class="text-sm font-bold text-blue-400 mb-1">(${percent}%)</span>
+                                    </div>
+                                </div>
+                            `;
+                        } else if (typeof q === 'object' && q.type === 'textarea') {
+                            statsHtml += `
+                                <div class="bg-gray-50 p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between">
+                                    <div>
+                                        <div class="flex items-center gap-2 mb-2">
+                                            <i class="fas fa-comments text-gray-400"></i>
+                                            <p class="text-xs text-gray-500 font-bold uppercase tracking-wide">Respuestas Abiertas</p>
+                                        </div>
+                                        <p class="font-medium text-gray-800 text-sm mb-4 line-clamp-2">${qText}</p>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-bold text-gray-700 text-lg">${responses.length}</span>
+                                        <span class="text-gray-500 text-sm">comentarios recopilados</span>
+                                    </div>
+                                </div>
+                            `;
+                        } else {
+                            let sum = responses.reduce((acc, val) => acc + parseInt(val), 0);
+                            let avg = (sum / responses.length).toFixed(1);
+                            let percent = Math.round((avg / maxScore) * 100);
+                            let colorClass = percent >= 80 ? 'bg-green-500' : (percent >= 60 ? 'bg-yellow-400' : 'bg-red-500');
+
+                            statsHtml += `
+                                <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-center hover:shadow-md transition-shadow">
+                                    <div class="flex justify-between items-start gap-4 mb-3">
+                                        <span class="font-medium text-gray-700 text-sm">${qText}</span>
+                                        <span class="font-bold text-gray-800 bg-gray-50 border border-gray-200 px-2 py-1 rounded-lg text-xs whitespace-nowrap shadow-inner">
+                                            <i class="fas fa-star text-accent text-[10px] mr-1"></i>${avg} / ${maxScore}
+                                        </span>
+                                    </div>
+                                    <div class="w-full bg-gray-100 rounded-full h-2.5 shadow-inner overflow-hidden">
+                                        <div class="${colorClass} h-2.5 rounded-full transition-all duration-700 ease-out" style="width: ${percent}%"></div>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    });
+                    statsHtml += `</div>`;
+                }
+                
+                document.getElementById('admin-question-stats').innerHTML = statsHtml;
+            },
+
+            exportToCSV() {
+                let dataToExport = MOCK_SUBMISSIONS;
+                if (this.adminFilterLevel !== 'todos') {
+                    dataToExport = MOCK_SUBMISSIONS.filter(s => s.evaluatorRole === this.adminFilterLevel);
+                }
+
+                if(dataToExport.length === 0) {
+                    showToast('No hay datos para exportar en este filtro', 'info');
+                    return;
+                }
+                
+                let csv = 'Fecha,Evaluador,Email,ID_Docente,Docente,Puntuacion_Media,Comentarios\n';
+                dataToExport.forEach(s => {
+                    const cleanComments = (s.comments || '').replace(/"/g, '""').replace(/\n/g, ' ');
+                    csv += `"${s.timestamp}","${s.evaluatorRole}","${s.evaluatorEmail}","${s.teacherId}","${s.teacherName}","${s.averageScore}","${cleanComments}"\n`;
+                });
+
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement("a");
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", "evaluaciones_cgb.csv");
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                showToast('Archivo exportado', 'success');
+            }
+        };
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const colors = { success: 'bg-green-500', error: 'bg-red-500', info: 'bg-blue-500' };
+            const icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', info: 'fa-info-circle' };
+
+            toast.className = `${colors[type]} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 toast-enter min-w-[250px]`;
+            toast.innerHTML = `<i class="fas ${icons[type]} text-xl"></i><span class="font-medium text-sm">${message}</span>`;
+            
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.replace('toast-enter', 'toast-exit');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        window.onload = () => app.init();
+    </script>
+</body>
+</html>
