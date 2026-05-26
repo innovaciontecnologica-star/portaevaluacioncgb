@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal de Evaluación - CGB</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        primary: '#1e40af', 
+                        secondary: '#3b82f6',
+                        accent: '#f59e0b'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .toast-enter { animation: toastSlideIn 0.3s forwards; }
+        .toast-exit { animation: toastSlideOut 0.3s forwards; }
+        @keyframes toastSlideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        @keyframes toastSlideOut { from { transform: translateX(0); } to { transform: translateX(100%); } }
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.5) rotate(-20deg); }
+            100% { opacity: 1; transform: scale(1) rotate(-12deg); }
+        }
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-15px); }
+            100% { transform: translateY(0px); }
+        }
+        
+        /* NUEVAS ANIMACIONES PARA LA CORTINILLA */
+        @keyframes scaleUp {
+            0% { transform: scale(0.85); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes pulseGlow {
+            0%, 100% { filter: drop-shadow(0 0 15px rgba(59, 130, 246, 0.4)); }
+            50% { filter: drop-shadow(0 0 30px rgba(59, 130, 246, 0.8)); }
+        }
+
+        /* NUEVAS ANIMACIONES PARA CORTINILLA SECUNDARIA */
+        @keyframes epicEntrance {
+            0% { opacity: 0; transform: scale(0.8) translateY(30px); filter: blur(10px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+        }
+        @keyframes floatLogo {
+            0% { transform: translateY(0px); filter: drop-shadow(0 10px 15px rgba(30, 64, 175, 0.15)); }
+            50% { transform: translateY(-10px); filter: drop-shadow(0 20px 25px rgba(30, 64, 175, 0.25)); }
+            100% { transform: translateY(0px); filter: drop-shadow(0 10px 15px rgba(30, 64, 175, 0.15)); }
+        }
+
+        /* Estilos para radio buttons tipo caritas/botones */
+        .radio-emoji-label:hover { transform: scale(1.1); }
+        .radio-emoji:checked + .radio-emoji-label { 
+            transform: scale(1.15); 
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2));
+            background-color: #eff6ff;
+            border-color: #3b82f6;
+        }
+        .likert-radio:checked + label, .likert-radio:checked + div {
+            background-color: #1e40af !important;
+            color: white !important;
+            border-color: #1e40af !important;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col text-slate-800">
+
+    <header id="main-header" class="bg-primary text-white shadow-md z-10 hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <i class="fas fa-graduation-cap text-2xl text-accent"></i>
+                <div class="flex items-baseline">
+                    <h1 class="font-bold text-xl tracking-tight">CGB Evalúa</h1>
+                    <span class="text-[10px] bg-blue-800 text-blue-200 px-1.5 py-0.5 rounded ml-2 font-mono uppercase tracking-wide">v1.5</span>
+                </div>
+            </div>
+            <div id="user-info" class="hidden flex items-center gap-4">
+                <span id="header-role" class="text-sm bg-blue-800 px-3 py-1 rounded-full font-medium"></span>
+                <span id="header-email" class="text-sm hidden sm:block"></span>
+                <span id="header-group" class="text-sm font-bold text-accent hidden sm:block"></span>
+                <button onclick="app.logout()" class="text-sm hover:text-red-300 transition-colors">
+                    <i class="fas fa-sign-out-alt mr-1"></i> Salir
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main id="app-container" class="flex-grow overflow-y-auto relative flex flex-col">
+    </main>
+
+    <div id="toast-container" class="fixed bottom-5 right-5 z-[100] flex flex-col gap-2"></div>
+
+    <script>
+        // =====================================================================
+        // --- CONFIGURACIÓN DE GOOGLE SHEETS ---
+        // =====================================================================
+        const GOOGLE_SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycby8QbChayeAMr5hlIbQ0d71nBqqmBzADkgRyuHjSwS8-PWwd3kSVT8veg6WWA5YSVIjyw/exec'; // URL de tu script de Google
+
+        // --- DATOS GLOBALES ---
+        let appTeachers = []; 
+        let appEmails = [];   
+        
+        // --- PLAN B (MOCK DATA) ---
+        const FALLBACK_TEACHERS = [
+            { id: 1, name: "Ana Martínez", gender: "F", levels: ['primaria_baja', 'primaria_alta'] },
+            { id: 2, name: "Carlos López", gender: "M", levels: ['primaria_alta'] },
+            { id: 3, name: "María Fernández", gender: "F", levels: ['secundaria', 'bachillerato'] },
+            { id: 4, name: "Roberto Gómez", gender: "M", levels: ['secundaria'] },
+            { id: 5, name: "Elena Rojas", gender: "F", levels: ['bachillerato'] },
+            { id: 6, name: "Laura Sánchez", gender: "F", levels: ['personal_cgb'] }
+        ];
+
+        const SUBJECT_OPTIONS_BAJA = [
+            { label: 'Español', emoji: '📖' }, { label: 'Inglés', emoji: '🗣️' }, { label: 'Cultura Física', emoji: '⚽' }, { label: 'Música', emoji: '🎵' }, { label: 'Arte', emoji: '🎨' }
+        ];
+
+        const SUBJECT_OPTIONS_ALTA = [
+            { label: 'Español', emoji: '📖' }, { label: 'Inglés', emoji: '🗣️' }, { label: 'Cultura Física', emoji: '⚽' }, { label: 'Música', emoji: '🎵' }, { label: 'Escultura', emoji: '🗿' }, { label: 'Baile', emoji: '🩰' }, { label: 'Teatro', emoji: '🎭' }
+        ];
+
+        const SECUNDARIA_MATERIAS = [
+            "Sustentabilidad", "Tecnología", "Español", "Historia", "Física", "Formación Cívica y Ética", 
+            "A2 Mr. Israel", "B1 - Miss Zeidy", "B1- Miss Brenda", "B1+ - Miss Bety", "B1+ - Miss Nadya", 
+            "Ecología", "Escultura", "Danza", "Dibujo", "Teatro", 
+            "Educación física - Miss Thania", "Educación física - Prof. Jorge", "Educación física - Miss Diana", 
+            "Tutoría Miss Sarai", "Tutoría Miss Paulina", "Tutoría Miss Nadya", "Tutoría Prof. Israel", 
+            "Tutoría Miss Cecilia", "Tutoría Miss Laura", "Tutoría Miss Ariadna"
+        ];
+
+        // Definición de las preguntas basadas en el PDF
+        const SECUNDARIA_PREGUNTAS = [
+            { type: 'frequency', text: "1. ¿El profesor o profesora es puntual al inicio de todas sus clases?" },
+            { type: 'frequency', text: "2. ¿El profesor o profesora demuestra tener preparadas todas sus clases y dominar los temas que imparte?" },
+            { type: 'frequency', text: "3. ¿El profesor o profesora indica cada parcial los temas y los objetivos a trabajar, te explica qué se va a hacer en cada periodo y cómo se va a evaluar?" },
+            { type: 'frequency', text: "4. ¿El profesor o profesora deja tareas para reforzar lo visto en clase o preparar el siguiente aprendizaje y las revisa?" },
+            { type: 'frequency', text: "5. ¿El profesor o profesora es claro en todos los trabajos o tareas que asigna para atender los temas?" },
+            { type: 'frequency', text: "6. ¿El profesor o profesora aclara las dudas que surgen durante las clases, en tareas o trabajos?" },
+            { type: 'frequency', text: "7. ¿El profesor o profesora genera diferentes estrategias o actividades para atender los diferentes temas en clase?" },
+            { type: 'frequency', text: "8. ¿El profesor o profesora se dirige a los estudiantes con respeto y con buena actitud durante las clases o ante cualquier conflicto?" },
+            { type: 'frequency', text: "9. ¿Lo que pregunta el profesor o profesora en sus exámenes es lo que se vio en clases?" },
+            
+            // Preguntas Generales (Aparecen 1 sola vez)
+            { type: 'subjects-check', text: "10. ¿Cuáles consideras que son las clases en las que has aprendido más?", options: SECUNDARIA_MATERIAS, isGeneral: true },
+            { type: 'subjects-check', text: "11. ¿Cuáles consideras que son las clases que deben mejorar?", options: SECUNDARIA_MATERIAS, isGeneral: true },
+            { type: 'direction-radio', text: "12. Elige las características que consideres describen mejor a la dirección de secundaria en este semestre:", 
+              options: [
+                  "Su trabajo es cercano y positivo para mí.", 
+                  "Me escucha.", 
+                  "Busca resolver mis necesidades.", 
+                  "Se presta al diálogo", 
+                  "Todas las anteriores", 
+                  "Ninguna de las anteriores"
+              ], isGeneral: true },
+            { type: 'textarea', text: "13. En este espacio escribe comentarios positivos o de mejora para los profesores que decidas al respecto de este semestre. Pueden ser todos o solo algunos.", isGeneral: true }
+        ];
+
+        const MOCK_QUESTIONS = {
+            primaria_baja: [
+                { type: 'faces', text: "1. Sí le entiendo a su clase y cuando me cuesta trabajo, me explica." },
+                { type: 'faces', text: "2. La tarea que me deja se me hace fácil porque ya lo vi en clase." },
+                { type: 'faces', text: "3. Sí me alcanza el tiempo para hacer la tarea." },
+                { type: 'faces', text: "4. Califica los trabajos y tareas." },
+                { type: 'faces', text: "5. Siempre está conmigo en el salón y me acompaña a mis actividades." },
+                { type: 'faces', text: "6. Hacemos muchas cosas diferentes en la clase y me gustan." },
+                { type: 'faces', text: "7. Me trata siempre con respeto." },
+                { type: 'faces', text: "8. Me dice lo que tengo que estudiar más para mejorar y cómo voy en clase." },
+                { type: 'faces', text: "9. Me invita a vivir los valores de honestidad, respeto, amistad, justicia y compromiso." },
+                { type: 'subjects', text: "10. La clase que más me gusta es:", isGeneral: true, options: SUBJECT_OPTIONS_BAJA },
+                { type: 'subjects', text: "11. La clase que no me gusta mucho es:", isGeneral: true, options: SUBJECT_OPTIONS_BAJA },
+                { type: 'textarea', text: "12. Escribe algo que le quieras decir a uno de tus maestros.", isGeneral: true }
+            ],
+            primaria_alta: [
+                { type: 'faces', text: "1. Sí le entiendo a su clase y cuando me cuesta trabajo, me explica." },
+                { type: 'faces', text: "2. La tarea que me deja se me hace fácil porque ya lo vi en clase." },
+                { type: 'faces', text: "3. Sí me alcanza el tiempo para hacer la tarea." },
+                { type: 'faces', text: "4. Califica los trabajos y tareas." },
+                { type: 'faces', text: "5. Siempre está conmigo en el salón y me acompaña a mis actividades." },
+                { type: 'faces', text: "6. Hacemos muchas cosas diferentes en la clase y me gustan." },
+                { type: 'faces', text: "7. Me trata siempre con respeto." },
+                { type: 'faces', text: "8. Me dice lo que tengo que estudiar más para mejorar y cómo voy en clase." },
+                { type: 'faces', text: "9. Me invita a vivir los valores de honestidad, respeto, amistad, justicia y compromiso." },
+                { type: 'subjects', text: "10. La clase que más me gusta es:", isGeneral: true, options: SUBJECT_OPTIONS_ALTA },
+                { type: 'subjects', text: "11. La clase que no me gusta mucho es:", isGeneral: true, options: SUBJECT_OPTIONS_ALTA },
+                { type: 'textarea', text: "12. Escribe algo que le quieras decir a uno de tus maestros.", isGeneral: true }
+            ],
+            secundaria: SECUNDARIA_PREGUNTAS,
+            bachillerato: SECUNDARIA_PREGUNTAS, // Comparten el mismo formato para esta versión
+            personal_cgb: [
+                { type: 'yesno', text: "1. ¿Muestra liderazgo y organización en sus actividades?" },
+                { type: 'yesno', text: "2. ¿La comunicación con el equipo de trabajo es efectiva?" },
+                { type: 'yesno', text: "3. ¿Cumple con los objetivos y tiempos establecidos?" },
+                { type: 'yesno', text: "4. ¿Fomenta un clima laboral positivo y colaborativo?" }
+            ]
+        };
+
+        // --- FUNCIONES GLOBALES DE RENDERIZADO DE AUTORÍA ---
+        function renderLightAuthorship() {
+            return `
+                <div class="w-full pb-6 pt-10 text-center mt-auto">
+                    <div class="inline-flex flex-col items-center justify-center opacity-70 hover:opacity-100 transition-opacity duration-500">
+                        <span class="text-[10px] sm:text-xs text-slate-500 font-medium tracking-[0.2em] uppercase mb-1">L.I.E. Arturo Palacios Gonzalez</span>
+                        <span class="text-[9px] sm:text-[10px] text-primary/80 font-extrabold tracking-[0.25em] uppercase flex items-center gap-2">
+                            <i class="fas fa-microchip text-[10px]"></i> Colegio Gran Bretaña <span class="w-1 h-1 bg-accent rounded-full"></span> Innovación Tecnológica
+                        </span>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- SISTEMA DE NOTIFICACIONES (TOASTS) ---
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            let bgColor = 'bg-blue-600'; let icon = 'fa-info-circle';
+            if (type === 'success') { bgColor = 'bg-green-600'; icon = 'fa-check-circle'; }
+            if (type === 'error') { bgColor = 'bg-red-600'; icon = 'fa-exclamation-circle'; }
+            if (type === 'warning') { bgColor = 'bg-yellow-500'; icon = 'fa-exclamation-triangle'; }
+
+            toast.className = `${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 toast-enter min-w-[250px]`;
+            toast.innerHTML = `<i class="fas ${icon} text-lg"></i><span class="font-medium text-sm">${message}</span>`;
+            
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.replace('toast-enter', 'toast-exit');
+                setTimeout(() => { if (container.contains(toast)) container.removeChild(toast); }, 300);
+            }, 3000);
+        }
+
+        // --- ESTADO DE LA APLICACIÓN ---
+        const app = {
+            currentUser: null,
+            currentView: 'splash',
+            selectedTeacher: null,
+            hasAnsweredGeneralQuestions: false, 
+            hiddenTeachers: [],
+            evaluatedTeachers: [],
+            showCompletionCelebration: false,
+            hasSeenCelebration: false,
+            adminFilterLevel: 'todos',
+            adminFilterTeacher: 'todos', 
+            loginGrade: null,
+            loginGroup: null,
+
+            async init() {
+                this.render(); 
+                await this.fetchInitialData(); 
+            },
+
+            async fetchInitialData() {
+                if (!GOOGLE_SHEETS_API_URL) {
+                    appTeachers = FALLBACK_TEACHERS;
+                    appEmails = []; 
+                    return;
+                }
+                try {
+                    const response = await fetch(GOOGLE_SHEETS_API_URL + "?action=getInitialData");
+                    const data = await response.json();
+                    if (data && data.teachers) {
+                        appTeachers = data.teachers;
+                        appEmails = data.emails || [];
+                    }
+                } catch (error) {
+                    appTeachers = FALLBACK_TEACHERS;
+                }
+            },
+
+            navigate(view) {
+                this.currentView = view;
+                this.render();
+            },
+
+            handleRoleChange() {
+                const role = document.getElementById('login-role').value;
+                const emailContainer = document.getElementById('email-container');
+                const gradeGroupContainer = document.getElementById('grade-group-container');
+                const gradeButtons = document.getElementById('grade-buttons');
+                
+                // Correos
+                if (['secundaria', 'bachillerato', 'personal_cgb', 'admin'].includes(role)) {
+                    emailContainer.classList.remove('hidden');
+                } else {
+                    emailContainer.classList.add('hidden');
+                }
+
+                // Grados y Grupos para Alumnos
+                if (['primaria_baja', 'primaria_alta', 'secundaria', 'bachillerato'].includes(role)) {
+                    gradeGroupContainer.classList.remove('hidden');
+                    
+                    // Ajustar límite de grados según nivel (Secundaria hasta 3ro, Bachillerato u otros hasta 6to)
+                    let maxGrade = (role === 'secundaria' || role === 'bachillerato') ? 3 : 6;
+                    let gradesHtml = '';
+                    for(let i=1; i<=maxGrade; i++) {
+                        gradesHtml += `<button type="button" id="grade-btn-${i}" class="grade-btn flex-1 py-2 rounded-lg border-2 border-gray-200 bg-white text-gray-700 font-bold transition-all hover:border-primary hover:text-primary" onclick="app.selectGrade(${i})">${i}º</button>`;
+                    }
+                    gradeButtons.innerHTML = gradesHtml;
+                    
+                    // Reset
+                    this.loginGrade = null;
+                    this.loginGroup = null;
+                    document.querySelectorAll('.group-btn').forEach(btn => {
+                        btn.classList.remove('bg-primary', 'text-white', 'border-primary');
+                        btn.classList.add('bg-white', 'text-gray-700', 'border-gray-200');
+                    });
+                } else {
+                    gradeGroupContainer.classList.add('hidden');
+                }
+            },
+
+            selectGrade(grade) {
+                this.loginGrade = grade;
+                document.querySelectorAll('.grade-btn').forEach(btn => {
+                    btn.classList.remove('bg-primary', 'text-white', 'border-primary');
+                    btn.classList.add('bg-white', 'text-gray-700', 'border-gray-200');
+                });
+                const selected = document.getElementById(`grade-btn-${grade}`);
+                selected.classList.remove('bg-white', 'text-gray-700', 'border-gray-200');
+                selected.classList.add('bg-primary', 'text-white', 'border-primary');
+            },
+
+            selectGroup(group) {
+                this.loginGroup = group;
+                document.querySelectorAll('.group-btn').forEach(btn => {
+                    btn.classList.remove('bg-primary', 'text-white', 'border-primary');
+                    btn.classList.add('bg-white', 'text-gray-700', 'border-gray-200');
+                });
+                const selected = document.getElementById(`group-btn-${group}`);
+                selected.classList.remove('bg-white', 'text-gray-700', 'border-gray-200');
+                selected.classList.add('bg-primary', 'text-white', 'border-primary');
+            },
+
+            processLogin() {
+                const role = document.getElementById('login-role').value;
+                if (!role) { showToast('Por favor, selecciona un nivel.', 'warning'); return; }
+
+                let email = '';
+                if (['secundaria', 'bachillerato', 'personal_cgb', 'admin'].includes(role)) {
+                    email = document.getElementById('login-email').value.trim();
+                    if (!email) { showToast('El correo institucional es requerido.', 'warning'); return; }
+                    if (!email.includes('@')) { showToast('Ingresa un correo válido.', 'error'); return; }
+                }
+
+                if (['primaria_baja', 'primaria_alta', 'secundaria', 'bachillerato'].includes(role)) {
+                    if (!this.loginGrade || !this.loginGroup) {
+                        showToast('Por favor, selecciona tu grado y grupo.', 'warning');
+                        return;
+                    }
+                }
+
+                this.currentUser = { 
+                    role, 
+                    email, 
+                    grade: this.loginGrade, 
+                    group: this.loginGroup 
+                };
+                
+                if (role === 'admin') this.navigate('admin');
+                else this.navigate('welcome');
+            },
+
+            // Límite de 3 opciones en Checklist
+            handleMax3(checkbox, indexStr) {
+                const checkedBoxes = document.querySelectorAll(`.q${indexStr}-checkbox:checked`);
+                if (checkedBoxes.length > 3) {
+                    checkbox.checked = false;
+                    showToast('Solo puedes seleccionar un máximo de 3 materias.', 'warning');
+                }
+            },
+
+            setAdminFilterLevel(level) {
+                this.adminFilterLevel = level;
+                this.renderAdminCharts();
+            },
+
+            toggleTeacher(id) {
+                if (this.hiddenTeachers.includes(id)) {
+                    this.hiddenTeachers = this.hiddenTeachers.filter(tId => tId !== id);
+                } else {
+                    this.hiddenTeachers.push(id);
+                }
+                this.checkCompletionStatus();
+                this.render();
+            },
+
+            startEvaluation(id) {
+                this.selectedTeacher = id;
+                this.navigate('form');
+            },
+
+            submitEvaluation(event) {
+                event.preventDefault();
+                
+                // Simulación de envío
+                this.evaluatedTeachers.push(this.selectedTeacher);
+                
+                // Marcar que ya respondió preguntas generales si existían en este form
+                const questions = MOCK_QUESTIONS[this.currentUser.role];
+                if (questions.some(q => q.isGeneral)) {
+                    this.hasAnsweredGeneralQuestions = true;
+                }
+
+                this.checkCompletionStatus();
+                showToast('Evaluación enviada exitosamente', 'success');
+                this.navigate('portal');
+            },
+
+            checkCompletionStatus() {
+                if (!this.currentUser) return;
+                const availableTeachers = appTeachers.filter(t => t.levels.includes(this.currentUser.role));
+                const activeTeachers = availableTeachers.filter(t => !this.hiddenTeachers.includes(t.id));
+                
+                if (activeTeachers.length > 0 && activeTeachers.every(t => this.evaluatedTeachers.includes(t.id))) {
+                    if (!this.hasSeenCelebration) {
+                        this.showCompletionCelebration = true;
+                        this.hasSeenCelebration = true;
+                    }
+                }
+            },
+
+            logout() {
+                this.currentUser = null;
+                this.selectedTeacher = null;
+                this.hasAnsweredGeneralQuestions = false; 
+                this.hiddenTeachers = []; 
+                this.evaluatedTeachers = []; 
+                this.showCompletionCelebration = false;
+                this.hasSeenCelebration = false;
+                this.loginGrade = null;
+                this.loginGroup = null;
+                this.navigate('splash');
+                showToast('Sesión cerrada correctamente', 'info');
+            },
+
+            closeCelebration() {
+                this.showCompletionCelebration = false;
+                this.render();
+            },
+
+            renderAdminCharts() {
+                this.render();
+            },
+
+            render() {
+                const container = document.getElementById('app-container');
+                const header = document.getElementById('main-header');
+                const userInfo = document.getElementById('user-info');
+                
+                container.innerHTML = '';
+
+                if (this.currentView === 'splash') {
+                    header.classList.add('hidden');
+                    container.classList.remove('p-4', 'sm:p-6', 'lg:p-8');
+                } else {
+                    header.classList.remove('hidden');
+                    container.classList.add('p-4', 'sm:p-6', 'lg:p-8');
+                }
+
+                switch(this.currentView) {
+                    case 'splash': container.innerHTML = this.views.splash(); break;
+                    case 'login': container.innerHTML = this.views.login(); break;
+                    case 'welcome': container.innerHTML = this.views.welcome(); break;
+                    case 'portal': container.innerHTML = this.views.portal(); break;
+                    case 'form': container.innerHTML = this.views.form(); break;
+                    case 'admin': container.innerHTML = this.views.admin(); break;
+                }
+
+                window.scrollTo(0, 0);
+                if (container) container.scrollTop = 0; // Fuerza al contenedor a ir hasta arriba
+
+                if (this.currentUser && this.currentView !== 'splash') {
+                    userInfo.classList.remove('hidden');
+                    const roleNames = {
+                        'primaria_baja': 'Primaria Baja', 'primaria_alta': 'Primaria Alta',
+                        'secundaria': 'Secundaria', 'bachillerato': 'Bachillerato',
+                        'personal_cgb': 'Personal CGB', 'admin': 'Administrador'
+                    };
+                    document.getElementById('header-role').innerText = roleNames[this.currentUser.role] || this.currentUser.role;
+                    document.getElementById('header-email').innerText = this.currentUser.email || '';
+                    
+                    const groupLabel = document.getElementById('header-group');
+                    if(this.currentUser.grade && this.currentUser.group) {
+                        groupLabel.innerText = `${this.currentUser.grade}º${this.currentUser.group}`;
+                        groupLabel.classList.remove('hidden');
+                    } else {
+                        groupLabel.classList.add('hidden');
+                    }
+                } else {
+                    userInfo.classList.add('hidden');
+                }
+            },
+
+            views: {
+                splash: () => `
+                    <div class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-[#0b132b] via-[#1e3a8a] to-[#0f172a] overflow-hidden">
+                        <div class="absolute top-0 left-0 w-full h-full overflow-hidden opacity-30 pointer-events-none">
+                            <div class="absolute -top-24 -left-24 w-[30rem] h-[30rem] bg-blue-500 rounded-full mix-blend-screen filter blur-[100px] animate-pulse"></div>
+                            <div class="absolute top-1/2 -right-20 w-[25rem] h-[25rem] bg-orange-600 rounded-full mix-blend-screen filter blur-[120px] animate-pulse" style="animation-delay: 2s;"></div>
+                        </div>
+
+                        <div class="relative z-10 flex flex-col items-center px-4 w-full" style="animation: scaleUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;">
+                            <div class="w-64 sm:w-80 md:w-96 mb-8" style="animation: pulseGlow 3s infinite alternate;">
+                                <img src="https://placehold.co/400x400/1e3a8a/ffffff?text=Guardianes+CGB" alt="Escudo Guardianes CGB" class="w-full h-auto object-contain drop-shadow-2xl rounded-full">
+                            </div>
+                            <h1 class="text-3xl sm:text-5xl font-extrabold text-white mb-2 tracking-widest text-center drop-shadow-lg">
+                                PORTAL DE EVALUACIÓN
+                            </h1>
+                            <p class="text-blue-200 text-lg sm:text-xl mb-12 font-light tracking-[0.2em] text-center uppercase">
+                                Colegio Gran Bretaña
+                            </p>
+                            <button onclick="app.navigate('login')" class="group relative px-10 py-4 bg-transparent overflow-hidden rounded-full border border-white/50 text-white font-bold text-lg tracking-widest uppercase hover:border-white hover:shadow-[0_0_20px_rgba(255,255,255,0.3)] transition-all duration-300">
+                                <div class="absolute inset-0 w-0 bg-white transition-all duration-[400ms] ease-out group-hover:w-full"></div>
+                                <span class="relative group-hover:text-primary transition-colors duration-300 flex items-center gap-3">
+                                    Ingresar <i class="fas fa-chevron-right transform group-hover:translate-x-2 transition-transform"></i>
+                                </span>
+                            </button>
+                        </div>
+                        
+                        <!-- AUTORÍA DARK THEME -->
+                        <div class="absolute bottom-6 w-full text-center z-20">
+                            <div class="inline-flex flex-col items-center justify-center opacity-50 hover:opacity-100 transition-opacity duration-500">
+                                <span class="text-[10px] sm:text-[11px] text-blue-200/80 font-medium tracking-[0.2em] uppercase mb-1">L.I.E. Arturo Palacios Gonzalez</span>
+                                <span class="text-[9px] sm:text-[10px] text-white/90 font-extrabold tracking-[0.25em] uppercase flex items-center gap-2">
+                                    <i class="fas fa-microchip text-[10px] text-accent"></i> Colegio Gran Bretaña <span class="w-1 h-1 bg-accent rounded-full"></span> Innovación Tecnológica
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                `,
+
+                login: () => `
+                    <div class="w-full flex-grow flex flex-col">
+                        <div class="max-w-md w-full mx-auto bg-white rounded-2xl shadow-xl overflow-hidden fade-in mt-6 sm:mt-10 mb-4">
+                            <div class="bg-primary p-6 text-center text-white">
+                                <i class="fas fa-user-circle text-5xl mb-3"></i>
+                                <h2 class="text-2xl font-bold">Datos Generales</h2>
+                                <p class="text-blue-200 text-sm mt-1">Completa tu información para comenzar</p>
+                            </div>
+                            <div class="p-6">
+                                <div class="mb-5">
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Nivel Educativo</label>
+                                    <select id="login-role" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary p-3 border outline-none bg-white transition-colors" onchange="app.handleRoleChange()">
+                                        <option value="" disabled selected>Selecciona un perfil...</option>
+                                        <option value="primaria_baja">Primaria Baja</option>
+                                        <option value="primaria_alta">Primaria Alta</option>
+                                        <option value="secundaria">Secundaria</option>
+                                        <option value="bachillerato">Bachillerato</option>
+                                        <option value="personal_cgb">Personal CGB</option>
+                                        <option value="admin">Administrador (Dashboard)</option>
+                                    </select>
+                                </div>
+                                
+                                <div id="email-container" class="mb-5 hidden fade-in">
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Correo Institucional</label>
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <i class="fas fa-envelope text-gray-400"></i>
+                                        </div>
+                                        <input type="email" id="login-email" placeholder="tu.nombre@cgb.edu.mx" class="w-full pl-10 border-gray-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary p-3 border outline-none transition-colors">
+                                    </div>
+                                </div>
+
+                                <!-- Selector de Grado y Grupo (Botones) -->
+                                <div id="grade-group-container" class="hidden fade-in mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                    <label class="block text-sm font-medium text-gray-700 mb-2"><i class="fas fa-layer-group text-primary mr-1"></i> Grado</label>
+                                    <div class="flex gap-2 mb-4" id="grade-buttons">
+                                        <!-- Botones de grado generados por JS -->
+                                    </div>
+                                    
+                                    <label class="block text-sm font-medium text-gray-700 mb-2"><i class="fas fa-users text-primary mr-1"></i> Grupo</label>
+                                    <div class="flex gap-2" id="group-buttons">
+                                        <button type="button" id="group-btn-A" class="group-btn flex-1 py-2 rounded-lg border-2 border-gray-200 bg-white text-gray-700 font-bold transition-all hover:border-primary hover:text-primary" onclick="app.selectGroup('A')">A</button>
+                                        <button type="button" id="group-btn-B" class="group-btn flex-1 py-2 rounded-lg border-2 border-gray-200 bg-white text-gray-700 font-bold transition-all hover:border-primary hover:text-primary" onclick="app.selectGroup('B')">B</button>
+                                        <button type="button" id="group-btn-C" class="group-btn flex-1 py-2 rounded-lg border-2 border-gray-200 bg-white text-gray-700 font-bold transition-all hover:border-primary hover:text-primary" onclick="app.selectGroup('C')">C</button>
+                                    </div>
+                                </div>
+
+                                <button onclick="app.processLogin()" class="w-full bg-primary hover:bg-blue-800 text-white font-semibold py-3.5 rounded-lg shadow transition-all transform hover:-translate-y-0.5 mt-2 text-lg">
+                                    Continuar <i class="fas fa-arrow-right ml-2"></i>
+                                </button>
+                            </div>
+                        </div>
+                        ${renderLightAuthorship()}
+                    </div>
+                `,
+
+                welcome: () => {
+                    const isKids = ['primaria_baja', 'primaria_alta'].includes(app.currentUser.role);
+
+                    if (isKids) {
+                        return `
+                            <div class="w-full flex-grow flex flex-col">
+                                <div class="max-w-2xl mx-auto text-center fade-in py-8 flex flex-col items-center justify-center mt-6">
+                                    <h2 class="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary mb-6" style="animation: popIn 0.6s ease-out forwards;">
+                                        ¡Hola! Soy Bretax
+                                    </h2>
+                                    
+                                    <div class="w-64 h-64 sm:w-72 sm:h-72 mx-auto mb-8 relative z-10" style="animation: float 3.5s ease-in-out infinite;">
+                                        <img src="https://placehold.co/300x300/f59e0b/ffffff?text=BRETAX+Mascota" alt="Bretax Sonríe" class="w-full h-full object-cover rounded-full border-4 border-white drop-shadow-2xl">
+                                    </div>
+                                    
+                                    <div class="bg-white px-8 py-6 rounded-3xl shadow-md border border-blue-100 mb-8 max-w-md relative z-0">
+                                        <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 w-6 h-6 bg-white border-t border-l border-blue-100 rotate-45"></div>
+                                        <p class="text-lg sm:text-xl text-gray-700 font-medium leading-relaxed">
+                                            ¡Qué gusto verte por aquí! Ayúdanos a evaluar a tus maestros. <br><br>
+                                            <span class="text-primary font-bold">¿Estás listo para la misión?</span>
+                                        </p>
+                                    </div>
+                                    
+                                    <button onclick="app.navigate('portal')" class="bg-accent hover:bg-yellow-500 text-white text-2xl font-bold py-4 px-12 rounded-full shadow-lg transition-transform transform hover:scale-110 animate-pulse">
+                                        ¡Comenzar! <i class="fas fa-rocket ml-2"></i>
+                                    </button>
+                                </div>
+                                ${renderLightAuthorship()}
+                            </div>
+                        `;
+                    } else {
+                        return `
+                            <div class="w-full flex-grow flex flex-col">
+                                <div class="max-w-3xl mx-auto text-center fade-in py-8 flex flex-col items-center justify-center mt-6">
+                                    <div class="w-full max-w-[18rem] sm:max-w-md mx-auto mb-10" style="animation: epicEntrance 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards, floatLogo 5s ease-in-out infinite 1.2s;">
+                                        <img src="./logo CGB (1).png" alt="Logo Colegio Gran Bretaña" class="w-full h-auto object-contain" onerror="this.src='https://placehold.co/600x200/1e40af/ffffff?text=COLEGIO+GRAN+BRETAÑA'">
+                                    </div>
+
+                                    <div class="bg-white/90 backdrop-blur-md px-6 py-8 sm:px-10 sm:py-10 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-100 mb-10 text-left w-full relative overflow-hidden" style="animation: fadeIn 1s ease-out 0.6s both;">
+                                        <div class="absolute top-0 left-0 w-3 h-full bg-gradient-to-b from-primary to-secondary"></div>
+                                        
+                                        <h2 class="text-3xl font-extrabold text-gray-800 mb-4 tracking-tight">Tu evaluación nos hace grandes</h2>
+                                        <p class="text-gray-600 mb-8 text-lg leading-relaxed">
+                                            Tu opinión es una herramienta clave para reconocer la excelencia docente y encontrar oportunidades de mejora. Ayúdanos a seguir elevando el nivel académico del <strong>Colegio Gran Bretaña</strong>.
+                                        </p>
+                                        
+                                        <div class="bg-blue-50/80 p-6 rounded-2xl border border-blue-100 flex flex-col sm:flex-row gap-5 items-start transition-transform hover:scale-[1.01] duration-300">
+                                            <div class="bg-blue-600 text-white p-3 rounded-xl shadow-md flex-shrink-0">
+                                                <i class="fas fa-toggle-on text-2xl"></i>
+                                            </div>
+                                            <div>
+                                                <h3 class="font-bold text-blue-900 text-lg mb-1">Instrucción Importante</h3>
+                                                <p class="text-blue-800 text-base leading-relaxed">
+                                                    Para que tu proceso sea más rápido y preciso, busca en la lista y <strong>apaga el switch</strong> de los maestros que <span class="underline font-semibold">no te imparten clases</span>. Así la plataforma solo te pedirá evaluar a tus docentes actuales.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <button onclick="app.navigate('portal')" class="bg-primary hover:bg-blue-800 text-white text-xl font-bold py-4 px-12 rounded-2xl shadow-[0_10px_20px_rgba(30,64,175,0.3)] transition-all transform hover:-translate-y-1 hover:shadow-[0_15px_30px_rgba(30,64,175,0.4)] relative overflow-hidden group" style="animation: fadeIn 1s ease-out 1s both;">
+                                        <span class="relative z-10 flex items-center gap-3">Entendido, comenzar evaluación <i class="fas fa-arrow-right group-hover:translate-x-1 transition-transform"></i></span>
+                                        <div class="absolute inset-0 bg-white/20 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                                    </button>
+                                </div>
+                                ${renderLightAuthorship()}
+                            </div>
+                        `;
+                    }
+                },
+
+                portal: () => {
+                    const role = app.currentUser.role;
+                    const availableTeachers = appTeachers.filter(t => t.levels.includes(role));
+
+                    let html = `
+                        <div class="w-full flex-grow flex flex-col">
+                            <div class="max-w-5xl w-full mx-auto fade-in">
+                                <div class="mb-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between flex-wrap gap-4">
+                                    <div>
+                                        <h2 class="text-3xl font-bold text-gray-800">Personal a Evaluar</h2>
+                                        <p class="text-gray-600 mt-1">Apaga el switch de los maestros que no te dan clases. Selecciona a los demás para evaluarlos.</p>
+                                    </div>
+                                    <div class="bg-blue-50 text-primary px-4 py-2 rounded-lg font-semibold text-sm">
+                                        <i class="fas fa-tasks mr-2"></i> 
+                                        Completados: ${availableTeachers.filter(t => app.evaluatedTeachers.includes(t.id) || app.hiddenTeachers.includes(t.id)).length} / ${availableTeachers.length}
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    `;
+
+                    if (availableTeachers.length === 0) {
+                        html += `<div class="col-span-full p-12 text-center bg-white rounded-xl border border-gray-200 shadow-sm">
+                                    <i class="fas fa-folder-open text-5xl text-gray-300 mb-4"></i>
+                                    <h3 class="text-xl font-medium text-gray-700">Sin asignaciones</h3>
+                                    <p class="text-gray-500 mt-2">No hay personal asignado para evaluar en este nivel.</p>
+                                 </div>`;
+                    }
+
+                    availableTeachers.forEach(teacher => {
+                        const avatarEmoji = teacher.gender === 'F' ? '👩‍🏫' : '👨‍🏫';
+                        const isHidden = app.hiddenTeachers.includes(teacher.id); 
+                        const isEvaluated = app.evaluatedTeachers.includes(teacher.id); 
+                        
+                        let cardClasses = 'bg-white rounded-xl shadow-sm border transition-all p-5 flex flex-col items-center text-center group relative overflow-hidden ';
+                        if (isEvaluated) cardClasses += 'border-green-300 bg-green-50';
+                        else if (isHidden) cardClasses += 'border-gray-200 bg-gray-50 opacity-75';
+                        else cardClasses += 'border-gray-100 hover:shadow-md hover:border-blue-200';
+                        
+                        html += `
+                            <div class="${cardClasses}">
+                                ${isEvaluated ? `
+                                <div class="absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-[1px] rounded-xl animate-[fadeIn_0.5s_ease-out]">
+                                    <div class="transform -rotate-12 bg-green-500 text-white font-bold py-2 px-6 rounded-lg shadow-lg border-2 border-white text-xl" style="animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;">
+                                        <i class="fas fa-check-circle mr-1"></i> ¡EVALUADO!
+                                    </div>
+                                </div>
+                                ` : ''}
+
+                                <div class="w-full flex justify-between items-center bg-gray-50 px-3 py-2 rounded-lg mb-4 border border-gray-100 relative z-0">
+                                    <span class="text-xs font-medium ${isHidden ? 'text-gray-400' : 'text-gray-700'}">Sí me da clases</span>
+                                    <label class="flex items-center ${isEvaluated ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}">
+                                        <div class="relative">
+                                            <input type="checkbox" class="sr-only peer" ${!isHidden ? 'checked' : ''} ${isEvaluated ? 'disabled' : ''} onchange="app.toggleTeacher(${teacher.id})">
+                                            <div class="block bg-gray-300 peer-checked:bg-green-500 w-9 h-5 rounded-full transition-colors"></div>
+                                            <div class="dot absolute left-[2px] top-[2px] bg-white w-4 h-4 rounded-full transition-transform peer-checked:translate-x-4 shadow-sm"></div>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                <div class="w-20 h-20 ${isHidden ? 'bg-gray-100' : 'bg-blue-50'} border ${isHidden ? 'border-gray-200' : 'border-blue-100'} rounded-full flex items-center justify-center text-4xl mb-3 ${isHidden || isEvaluated ? '' : 'group-hover:scale-110 cursor-pointer'} transition-transform shadow-sm relative z-0" ${isHidden || isEvaluated ? '' : `onclick="app.startEvaluation(${teacher.id})"`}>
+                                    <span class="${isHidden ? 'grayscale opacity-50' : ''}">${avatarEmoji}</span>
+                                </div>
+                                <h3 class="font-semibold text-lg ${isHidden ? 'text-gray-400 line-through' : 'text-gray-800'} relative z-0">${teacher.name}</h3>
+                                <div class="flex gap-1 mt-2 flex-wrap justify-center relative z-0">
+                                    ${teacher.levels.map(l => `<span class="text-[10px] ${isHidden ? 'bg-gray-200 text-gray-400' : 'bg-blue-100 text-blue-700'} px-2 py-1 rounded-full uppercase tracking-wide font-bold">${l.replace('_', ' ')}</span>`).join('')}
+                                </div>
+                                
+                                <div class="w-full mt-5 relative z-0">
+                                ${isEvaluated ? 
+                                    `<button disabled class="w-full bg-green-100 text-green-700 py-2.5 rounded-lg text-sm font-bold cursor-not-allowed border border-green-200"><i class="fas fa-check mr-1"></i> Completado</button>`
+                                : isHidden ? 
+                                    `<button disabled class="w-full bg-gray-200 text-gray-400 py-2.5 rounded-lg text-sm font-medium cursor-not-allowed"><i class="fas fa-eye-slash mr-1"></i> Omitido</button>` 
+                                : 
+                                    `<button onclick="app.startEvaluation(${teacher.id})" class="w-full bg-primary text-white hover:bg-blue-800 py-2.5 rounded-lg text-sm font-semibold transition-all transform hover:-translate-y-0.5 shadow-sm"><i class="fas fa-pen mr-1"></i> Evaluar</button>`
+                                }
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    html += `</div></div>`; 
+
+                    if (app.showCompletionCelebration) {
+                        html += `
+                            <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/80 backdrop-blur-sm fade-in">
+                                <div class="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full text-center relative mx-4" style="animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;">
+                                    <div class="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-white rounded-full p-2 shadow-lg">
+                                        <div class="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center text-white text-3xl">
+                                            <i class="fas fa-star"></i>
+                                        </div>
+                                    </div>
+                                    <h2 class="text-3xl font-extrabold text-green-600 mt-8 mb-2">¡Misión Cumplida!</h2>
+                                    <p class="text-gray-600 mb-6 font-medium">Has completado todas tus evaluaciones.</p>
+                                    
+                                    <div class="w-48 h-48 mx-auto mb-6 flex justify-center items-center">
+                                        <img src="https://placehold.co/200x200/f59e0b/ffffff?text=CGB" alt="CGB Logo Final" class="w-full h-full object-cover rounded-full border-4 border-yellow-400 drop-shadow-xl">
+                                    </div>
+                                    
+                                    <button onclick="app.closeCelebration()" class="w-full bg-primary hover:bg-blue-800 text-white font-bold py-3.5 rounded-xl shadow-lg transition-transform transform hover:-translate-y-0.5">
+                                        <i class="fas fa-check-circle mr-2"></i> ¡Entendido!
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    html += renderLightAuthorship();
+                    html += `</div>`; 
+                    return html;
+                },
+
+                form: () => {
+                    const teacher = appTeachers.find(t => t.id === app.selectedTeacher);
+                    const questions = MOCK_QUESTIONS[app.currentUser.role];
+                    
+                    let html = `
+                        <div class="w-full flex-grow flex flex-col">
+                            <div class="max-w-3xl w-full mx-auto fade-in">
+                                <button onclick="app.navigate('portal')" class="text-gray-500 hover:text-primary mb-4 flex items-center gap-2 transition-colors font-medium">
+                                    <i class="fas fa-arrow-left"></i> Volver al menú
+                                </button>
+                                
+                                <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
+                                    <div class="bg-gradient-to-r from-primary to-blue-800 p-6 sm:p-8 text-white flex flex-col sm:flex-row justify-between items-center sm:items-end gap-4 relative overflow-hidden">
+                                        <div class="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
+                                        <div class="flex items-center gap-5 z-10">
+                                            <div class="w-16 h-16 sm:w-20 sm:h-20 bg-white/20 backdrop-blur-sm border-2 border-white/40 rounded-full flex items-center justify-center text-3xl sm:text-4xl shadow-inner">
+                                                ${teacher.gender === 'F' ? '👩‍🏫' : '👨‍🏫'}
+                                            </div>
+                                            <div>
+                                                <p class="text-blue-200 text-sm font-semibold uppercase tracking-wider mb-1">Evaluando a</p>
+                                                <h2 class="text-2xl sm:text-3xl font-bold">${teacher.name}</h2>
+                                            </div>
+                                        </div>
+                                        <div class="bg-blue-900/50 backdrop-blur-sm px-4 py-1.5 rounded-full text-sm font-medium border border-blue-400/30 z-10">
+                                            ${app.currentUser.role.replace('_', ' ').toUpperCase()}
+                                        </div>
+                                    </div>
+                                    
+                                    <form onsubmit="app.submitEvaluation(event)" class="p-6 sm:p-8">
+                                        <div class="space-y-8">
+                    `;
+
+                    questions.forEach((q, index) => {
+                        // Ocultar las preguntas generales si ya se contestaron con otro maestro
+                        if (q.isGeneral && app.hasAnsweredGeneralQuestions) return;
+
+                        html += `<div class="bg-gray-50 p-6 rounded-xl border border-gray-100">`;
+                        
+                        // TEXTO DE LA PREGUNTA
+                        html += `<label class="block text-lg font-semibold text-gray-800 mb-5 leading-relaxed">${q.text}</label>`;
+
+                        // TIPO DE PREGUNTA: FRECUENCIA (Siempre, A veces, Nunca)
+                        if (q.type === 'frequency') {
+                            html += `
+                                <div class="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-2">
+                                    ${['SIEMPRE', 'A VECES', 'NUNCA'].map(val => `
+                                        <label class="flex-1 cursor-pointer group">
+                                            <input type="radio" name="q${index}" value="${val}" class="sr-only likert-radio" required>
+                                            <div class="w-full py-3.5 text-center rounded-xl border-2 border-gray-200 bg-white font-bold text-gray-600 transition-all group-hover:border-primary group-hover:text-primary text-sm shadow-sm">
+                                                ${val}
+                                            </div>
+                                        </label>
+                                    `).join('')}
+                                </div>
+                            `;
+                        }
+                        // TIPO DE PREGUNTA: CHECKLIST MATERIAS MÁXIMO 3
+                        else if (q.type === 'subjects-check') {
+                            html += `
+                                <p class="text-sm text-primary font-semibold mb-4 bg-blue-50 p-3 rounded-lg border border-blue-100"><i class="fas fa-info-circle mr-1"></i> Selecciona máximo 3 materias de la lista.</p>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-72 overflow-y-auto p-3 border border-gray-200 rounded-xl bg-white shadow-inner scrollbar-thin">
+                                    ${q.options.map((opt, optIdx) => `
+                                        <label class="cursor-pointer">
+                                            <input type="checkbox" name="q${index}" value="${opt}" class="sr-only peer q${index}-checkbox" onchange="app.handleMax3(this, '${index}')">
+                                            <div class="flex items-start gap-3 p-3 rounded-lg border-2 border-transparent bg-gray-50 text-gray-600 font-medium transition-all peer-checked:border-primary peer-checked:bg-blue-50 peer-checked:text-primary hover:bg-gray-100 text-sm leading-tight h-full">
+                                                <div class="w-5 h-5 mt-0.5 rounded border-2 border-gray-300 peer-checked:border-primary peer-checked:bg-primary flex items-center justify-center shrink-0">
+                                                    <i class="fas fa-check text-white text-[10px] opacity-0 peer-checked:opacity-100"></i>
+                                                </div>
+                                                ${opt}
+                                            </div>
+                                        </label>
+                                    `).join('')}
+                                </div>
+                            `;
+                        }
+                        // TIPO DE PREGUNTA: DIRECCIÓN RADIO (Varias opciones, elegir una)
+                        else if (q.type === 'direction-radio') {
+                            html += `
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                                    ${q.options.map((opt, optIdx) => `
+                                        <label class="cursor-pointer">
+                                            <input type="radio" name="q${index}" value="${opt}" class="sr-only peer" required>
+                                            <div class="flex items-center gap-3 p-4 rounded-xl border-2 border-gray-200 bg-white text-gray-700 font-medium transition-all peer-checked:border-primary peer-checked:bg-blue-50 peer-checked:text-primary hover:bg-gray-50 shadow-sm h-full">
+                                                <div class="w-5 h-5 rounded-full border-2 border-gray-300 peer-checked:border-primary peer-checked:bg-primary flex items-center justify-center shrink-0">
+                                                    <div class="w-2 h-2 rounded-full bg-white opacity-0 peer-checked:opacity-100"></div>
+                                                </div>
+                                                <span class="text-sm leading-tight">${opt}</span>
+                                            </div>
+                                        </label>
+                                    `).join('')}
+                                </div>
+                            `;
+                        }
+                        // TIPO DE PREGUNTA: CARITAS PRIMARIA
+                        else if (q.type === 'faces') {
+                            html += `
+                                <div class="flex justify-center gap-4 sm:gap-8 mt-4">
+                                    <div class="text-center">
+                                        <input type="radio" name="q${index}" id="q${index}_happy" value="happy" class="sr-only radio-emoji" required>
+                                        <label for="q${index}_happy" class="radio-emoji-label cursor-pointer inline-block text-5xl sm:text-6xl transition-all duration-200 filter grayscale opacity-60 p-2 rounded-full border-4 border-transparent">😃</label>
+                                        <p class="mt-2 text-xs font-bold text-gray-500 uppercase">Siempre</p>
+                                    </div>
+                                    <div class="text-center">
+                                        <input type="radio" name="q${index}" id="q${index}_neutral" value="neutral" class="sr-only radio-emoji">
+                                        <label for="q${index}_neutral" class="radio-emoji-label cursor-pointer inline-block text-5xl sm:text-6xl transition-all duration-200 filter grayscale opacity-60 p-2 rounded-full border-4 border-transparent">😐</label>
+                                        <p class="mt-2 text-xs font-bold text-gray-500 uppercase">A veces</p>
+                                    </div>
+                                    <div class="text-center">
+                                        <input type="radio" name="q${index}" id="q${index}_sad" value="sad" class="sr-only radio-emoji">
+                                        <label for="q${index}_sad" class="radio-emoji-label cursor-pointer inline-block text-5xl sm:text-6xl transition-all duration-200 filter grayscale opacity-60 p-2 rounded-full border-4 border-transparent">🙁</label>
+                                        <p class="mt-2 text-xs font-bold text-gray-500 uppercase">Casi nunca</p>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                        // TIPO DE PREGUNTA: MATERIAS PRIMARIA
+                        else if (q.type === 'subjects') {
+                            html += `
+                                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                    ${q.options.map((opt, optIdx) => `
+                                        <label class="cursor-pointer">
+                                            <input type="radio" name="q${index}" value="${opt.label}" class="sr-only peer" required>
+                                            <div class="flex items-center justify-center gap-2 p-3 rounded-lg border-2 border-gray-200 bg-white text-gray-600 font-medium transition-all peer-checked:border-primary peer-checked:bg-blue-50 peer-checked:text-primary hover:bg-gray-100">
+                                                <span class="text-xl">${opt.emoji}</span> ${opt.label}
+                                            </div>
+                                        </label>
+                                    `).join('')}
+                                </div>
+                            `;
+                        }
+                        // TIPO DE PREGUNTA: SÍ/NO PERSONAL
+                        else if (q.type === 'yesno') {
+                            html += `
+                                <div class="flex gap-4">
+                                    <label class="flex-1 cursor-pointer">
+                                        <input type="radio" name="q${index}" value="yes" class="sr-only likert-radio" required>
+                                        <div class="text-center p-3 rounded-xl border-2 border-gray-200 bg-white font-bold text-gray-700 transition-colors hover:bg-gray-50">Sí</div>
+                                    </label>
+                                    <label class="flex-1 cursor-pointer">
+                                        <input type="radio" name="q${index}" value="no" class="sr-only likert-radio">
+                                        <div class="text-center p-3 rounded-xl border-2 border-gray-200 bg-white font-bold text-gray-700 transition-colors hover:bg-gray-50">No</div>
+                                    </label>
+                                </div>
+                            `;
+                        }
+                        // TIPO DE PREGUNTA: TEXTAREA
+                        else if (q.type === 'textarea') {
+                            html += `<textarea name="q${index}" rows="4" class="w-full border-gray-300 rounded-xl shadow-sm focus:border-primary focus:ring-primary p-4 border-2 outline-none resize-none bg-white text-gray-700" placeholder="Escribe tu mensaje aquí..." required></textarea>`;
+                        }
+                        
+                        html += `</div>`;
+                    });
+
+                    html += `
+                                        </div>
+                                        
+                                        <div class="mt-8 pt-6 border-t border-gray-100">
+                                            <button type="submit" class="w-full bg-primary hover:bg-blue-800 text-white font-bold py-4 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 text-lg flex justify-center items-center gap-2">
+                                                <i class="fas fa-paper-plane"></i> Enviar Evaluación
+                                            </button>
+                                            <p class="text-center text-sm text-gray-400 mt-4"><i class="fas fa-lock mr-1"></i> Tus respuestas son anónimas y confidenciales.</p>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                            ${renderLightAuthorship()}
+                        </div>
+                    `;
+                    return html;
+                },
+
+                admin: () => {
+                    const totalTeachers = appTeachers.length;
+                    const totalEvaluations = Math.floor(Math.random() * 200) + 50; 
+                    const completionRate = Math.floor(Math.random() * 40) + 60;
+                    const avgScore = (Math.random() * 1.5 + 3.5).toFixed(1);
+
+                    let html = `
+                        <div class="w-full flex-grow flex flex-col">
+                            <div class="max-w-6xl w-full mx-auto fade-in">
+                                <div class="flex justify-between items-end mb-8">
+                                    <div>
+                                        <h2 class="text-3xl font-bold text-gray-800 mb-2">Panel Administrativo</h2>
+                                        <p class="text-gray-600">Resumen y métricas de evaluación institucional.</p>
+                                    </div>
+                                    <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium shadow transition-colors flex items-center gap-2">
+                                        <i class="fas fa-file-excel"></i> Exportar a Excel
+                                    </button>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
+                                        <div class="w-14 h-14 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center text-2xl"><i class="fas fa-users"></i></div>
+                                        <div><p class="text-sm text-gray-500 font-medium">Personal</p><p class="text-2xl font-bold text-gray-800">${totalTeachers}</p></div>
+                                    </div>
+                                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
+                                        <div class="w-14 h-14 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center text-2xl"><i class="fas fa-file-alt"></i></div>
+                                        <div><p class="text-sm text-gray-500 font-medium">Evaluaciones</p><p class="text-2xl font-bold text-gray-800">${totalEvaluations}</p></div>
+                                    </div>
+                                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
+                                        <div class="w-14 h-14 bg-green-100 text-green-600 rounded-xl flex items-center justify-center text-2xl"><i class="fas fa-chart-pie"></i></div>
+                                        <div><p class="text-sm text-gray-500 font-medium">Participación</p><p class="text-2xl font-bold text-gray-800">${completionRate}%</p></div>
+                                    </div>
+                                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
+                                        <div class="w-14 h-14 bg-yellow-100 text-yellow-600 rounded-xl flex items-center justify-center text-2xl"><i class="fas fa-star"></i></div>
+                                        <div><p class="text-sm text-gray-500 font-medium">Promedio Global</p><p class="text-2xl font-bold text-gray-800">${avgScore} <span class="text-sm text-gray-400 font-normal">/ 5.0</span></p></div>
+                                    </div>
+                                </div>
+                                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                                    <div class="p-6 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row gap-4 justify-between items-center">
+                                        <h3 class="font-bold text-lg text-gray-800"><i class="fas fa-list-ul text-primary mr-2"></i> Estado de Evaluaciones</h3>
+                                        <div class="flex gap-4 w-full sm:w-auto">
+                                            <select class="border-gray-300 rounded-lg p-2 text-sm flex-1 outline-none focus:border-primary border bg-white" onchange="app.setAdminFilterLevel(this.value)">
+                                                <option value="todos">Todos los Niveles</option>
+                                                <option value="primaria_baja">Primaria Baja</option>
+                                                <option value="primaria_alta">Primaria Alta</option>
+                                                <option value="secundaria">Secundaria</option>
+                                                <option value="bachillerato">Bachillerato</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="overflow-x-auto">
+                                        <table class="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr class="bg-gray-50 text-gray-500 text-sm uppercase tracking-wider">
+                                                    <th class="p-4 font-medium border-b border-gray-200">Docente</th>
+                                                    <th class="p-4 font-medium border-b border-gray-200">Niveles</th>
+                                                    <th class="p-4 font-medium border-b border-gray-200 text-center">Respuestas</th>
+                                                    <th class="p-4 font-medium border-b border-gray-200 text-center">Puntaje</th>
+                                                    <th class="p-4 font-medium border-b border-gray-200 text-right">Acción</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-gray-100">
+                                                ${appTeachers.map(teacher => {
+                                                    const resp = Math.floor(Math.random() * 30);
+                                                    const score = resp > 0 ? (Math.random() * 1.5 + 3.5).toFixed(1) : '-';
+                                                    if (app.adminFilterLevel !== 'todos' && !teacher.levels.includes(app.adminFilterLevel)) return '';
+                                                    return `
+                                                    <tr class="hover:bg-blue-50/30 transition-colors">
+                                                        <td class="p-4">
+                                                            <div class="flex items-center gap-3">
+                                                                <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-lg">${teacher.gender === 'F' ? '👩‍🏫' : '👨‍🏫'}</div>
+                                                                <span class="font-medium text-gray-800">${teacher.name}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td class="p-4">
+                                                            <div class="flex flex-wrap gap-1">
+                                                                ${teacher.levels.map(l => `<span class="text-[10px] bg-gray-100 text-gray-600 px-2 py-1 rounded uppercase">${l.replace('_', ' ')}</span>`).join('')}
+                                                            </div>
+                                                        </td>
+                                                        <td class="p-4 text-center"><span class="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none ${resp > 0 ? 'text-green-800 bg-green-100' : 'text-gray-800 bg-gray-100'} rounded-full">${resp}</span></td>
+                                                        <td class="p-4 text-center font-semibold text-gray-700">${score !== '-' ? `<i class="fas fa-star text-yellow-400 text-xs mr-1"></i>${score}` : '<span class="text-gray-400">-</span>'}</td>
+                                                        <td class="p-4 text-right"><button class="text-primary hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded text-sm transition-colors" ${resp === 0 ? 'disabled style="opacity:0.5"' : ''}>Ver Detalle</button></td>
+                                                    </tr>`;
+                                                }).join('')}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                            ${renderLightAuthorship()}
+                        </div>
+                    `;
+                    return html;
+                }
+            }
+        };
+
+        window.onload = () => app.init();
+    </script>
+</body>
+</html>
