@@ -1,0 +1,1519 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal de Evaluación - CGB v6.0.2 (Gold Release)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght=300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        primary: '#1e40af', // Azul CGB Oficial
+                        secondary: '#3b82f6', // Azul Eléctrico
+                        accent: '#dc2626', // Rojo Carmín CGB
+                        success: '#10b981', // Verde Esmeralda
+                        warning: '#f59e0b', // Ámbar Cálido
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at top right, #f8fafc, #e2e8f0);
+            min-height: 100vh;
+        }
+        /* Cristalografía premium */
+        .glass {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+        .glass-dark {
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(51, 65, 85, 0.5);
+        }
+        /* Animación para Rombos Rotados (Diamonds Scale 1 al 5) */
+        .diamond-pulse {
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .diamond-pulse:hover {
+            transform: rotate(45deg) scale(1.15);
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.6);
+        }
+        .diamond-active {
+            transform: rotate(45deg) scale(1.1);
+            background: #1e40af !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 20px rgba(30, 64, 175, 0.8);
+        }
+        /* Confeti dinámico para pantalla de éxito en primaria */
+        .confetti {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: #3b82f6;
+            border-radius: 50%;
+            animation: confetti-fall 3s linear infinite;
+        }
+        @keyframes confetti-fall {
+            0% { transform: translateY(-50px) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+        }
+        /* Brinco interactivo de Bretax */
+        @keyframes bretax-bounce {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-15px) scale(1.03); }
+        }
+        .bretax-celebrate {
+            animation: bretax-bounce 2s ease-in-out infinite;
+        }
+        /* Custom scrollbar corporativa */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        /* Transiciones fluidas para notificaciones Toast */
+        .toast-enter {
+            animation: slide-in 0.3s ease-out forwards;
+        }
+        .toast-exit {
+            animation: slide-out 0.3s ease-in forwards;
+        }
+        @keyframes slide-in {
+            from { transform: translateY(100%) scale(0.9); opacity: 0; }
+            to { transform: translateY(0) scale(1); opacity: 1; }
+        }
+        @keyframes slide-out {
+            from { transform: translateY(0) scale(1); opacity: 1; }
+            to { transform: translateY(100%) scale(0.9); opacity: 0; }
+        }
+        /* Animaciones para la cortinilla */
+        @keyframes scaleUp {
+            0% { transform: scale(0.92); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes pulseGlow {
+            0%, 100% { filter: drop-shadow(0 0 15px rgba(59, 130, 246, 0.3)); }
+            50% { filter: drop-shadow(0 0 25px rgba(59, 130, 246, 0.6)); }
+        }
+        .animate-scaleUp {
+            animation: scaleUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .animate-pulseGlow {
+            animation: pulseGlow 3s infinite alternate;
+        }
+    </style>
+</head>
+<body class="relative overflow-x-hidden text-slate-800 flex flex-col min-h-screen">
+
+    <div id="loading-spinner" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex flex-col items-center justify-center gap-4 hidden">
+        <div class="relative w-20 h-20">
+            <div class="absolute inset-0 border-4 border-slate-700 rounded-full"></div>
+            <div class="absolute inset-0 border-4 border-t-blue-600 rounded-full animate-spin"></div>
+        </div>
+        <p class="text-white font-bold text-lg tracking-wide animate-pulse">Estableciendo puente seguro de datos...</p>
+    </div>
+
+    <header id="main-header" class="bg-primary text-white shadow-md z-10 hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <i class="fas fa-graduation-cap text-2xl text-accent"></i>
+                <div class="flex items-baseline">
+                    <h1 class="font-bold text-xl tracking-tight">CGB Evalúa</h1>
+                    <span class="text-[10px] bg-red-600 text-red-100 px-1.5 py-0.5 rounded ml-2 font-mono uppercase tracking-wide font-extrabold shadow-[0_0_10px_rgba(220,38,38,0.5)]">v6.0.2</span>
+                </div>
+            </div>
+            <div id="user-info" class="hidden flex items-center gap-4">
+                <span id="header-role" class="text-sm bg-blue-800 px-3 py-1 rounded-full font-medium"></span>
+                <span id="header-email" class="text-sm hidden sm:block"></span>
+                <button onclick="app.logout()" class="text-sm hover:text-red-300 transition-colors flex items-center gap-1">
+                    <i class="fas fa-sign-out-alt"></i> Salir
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div id="app-container" class="flex-grow w-full max-w-7xl mx-auto px-4 py-6 md:py-10 flex flex-col">
+        </div>
+
+    <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 max-w-md w-full pointer-events-none"></div>
+
+    <div id="config-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/70 backdrop-blur-sm hidden">
+        <div id="config-modal-body" class="bg-white p-6 rounded-2xl shadow-2xl max-w-lg w-full mx-4 border border-slate-100 animate-scaleUp">
+            </div>
+    </div>
+
+    <script>
+        const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbzo8KVJyB41UcKnKznqS72HZXhmBHYqpBnFw55Y_4z_-LGi7Iq4XOnY4tXgerQWs1Isjw/exec'; 
+        let GOOGLE_SHEETS_API_URL = localStorage.getItem('cgb_api_url') || DEFAULT_API_URL;
+
+        let appTeachers = []; 
+        let appEmails = [];   
+        let appEmailsLevels = {}; 
+        let appSubmissions = []; 
+        let MOCK_SUBMISSIONS = []; 
+
+        const FALLBACK_TEACHERS = [
+            { id: 1, name: "Miss Brenda (Cultura Física)", gender: "F", levels: ['primaria_baja'], email: 'brenda@cgb.edu.mx' },
+            { id: 2, name: "Miss Nadya (Música)", gender: "F", levels: ['primaria_baja'], email: 'nadya@cgb.edu.mx' },
+            { id: 3, name: "Prof. Jorge (Arte)", gender: "M", levels: ['primaria_baja'], email: 'jorge@cgb.edu.mx' },
+            { id: 4, name: "Miss Diana (Baile)", gender: "F", levels: ['primaria_baja'], email: 'diana@cgb.edu.mx' },
+            { id: 5, name: "Miss Sarai (Español)", gender: "F", levels: ['primaria_baja'], email: 'sarai@cgb.edu.mx' },
+            { id: 6, name: "Miss Elizabeth (Español)", gender: "F", levels: ['primaria_baja'], email: 'elizabeth@cgb.edu.mx' },
+            { id: 7, name: "Miss Lulú (Español)", gender: "F", levels: ['primaria_baja'], email: 'lulu@cgb.edu.mx' },
+            { id: 8, name: "Miss Marcela (Español)", gender: "F", levels: ['primaria_baja'], email: 'marcela@cgb.edu.mx' },
+            { id: 9, name: "Miss Andrea (Inglés)", gender: "F", levels: ['primaria_baja'], email: 'andrea@cgb.edu.mx' },
+
+            { id: 10, name: "Mr. Israel (Inglés A2)", gender: "M", levels: ['primaria_alta'], email: 'israel@cgb.edu.mx' },
+            { id: 11, name: "Miss Zeidy (Inglés B1)", gender: "F", levels: ['primaria_alta'], email: 'zeidy@cgb.edu.mx' },
+            { id: 12, name: "Miss Brenda (Cultura Física)", gender: "F", levels: ['primaria_alta'], email: 'brenda@cgb.edu.mx' },
+            { id: 13, name: "Miss Bety (Inglés B1+)", gender: "F", levels: ['primaria_alta'], email: 'bety@cgb.edu.mx' },
+            { id: 14, name: "Miss Nadya (Música)", gender: "F", levels: ['primaria_alta'], email: 'nadya@cgb.edu.mx' },
+            { id: 15, name: "Miss Thania (Educación Física)", gender: "F", levels: ['primaria_alta'], email: 'thania@cgb.edu.mx' },
+            { id: 16, name: "Prof. Jorge (Escultura)", gender: "M", levels: ['primaria_alta'], email: 'jorge@cgb.edu.mx' },
+            { id: 17, name: "Miss Diana (Baile)", gender: "F", levels: ['primaria_alta'], email: 'diana@cgb.edu.mx' },
+            { id: 18, name: "Miss Sarai (Español)", gender: "F", levels: ['primaria_alta'], email: 'sarai@cgb.edu.mx' },
+            { id: 19, name: "Miss Elizabeth (Español)", gender: "F", levels: ['primaria_alta'], email: 'elizabeth@cgb.edu.mx' },
+            { id: 20, name: "Miss Andrea (Inglés)", gender: "F", levels: ['primaria_alta'], email: 'andrea@cgb.edu.mx' },
+            { id: 21, name: "Miss Cecilia (Teatro)", gender: "F", levels: ['primaria_alta'], email: 'cecilia@cgb.edu.mx' },
+
+            { id: 22, name: "Mr. Israel (Inglés A2)", gender: "M", levels: ['secundaria'], email: 'israel@cgb.edu.mx' },
+            { id: 23, name: "Miss Zeidy (Inglés B1)", gender: "F", levels: ['secundaria'], email: 'zeidy@cgb.edu.mx' },
+            { id: 24, name: "Miss Brenda (Cultura Física)", gender: "F", levels: ['secundaria'], email: 'brenda@cgb.edu.mx' },
+            { id: 25, name: "Miss Bety (Inglés B1+)", gender: "F", levels: ['secundaria'], email: 'bety@cgb.edu.mx' },
+            { id: 26, name: "Miss Nadya (Música)", gender: "F", levels: ['secundaria'], email: 'nadya@cgb.edu.mx' },
+            { id: 27, name: "Miss Thania (Educación Física)", gender: "F", levels: ['secundaria'], email: 'thania@cgb.edu.mx' },
+            { id: 28, name: "Prof. Jorge (Arte)", gender: "M", levels: ['secundaria'], email: 'jorge@cgb.edu.mx' },
+            { id: 29, name: "Miss Diana (Baile)", gender: "F", levels: ['secundaria'], email: 'diana@cgb.edu.mx' },
+            { id: 30, name: "Miss Sarai (Español)", gender: "F", levels: ['secundaria'], email: 'sarai@cgb.edu.mx' },
+            { id: 31, name: "Miss Paulina (Tutoría)", gender: "F", levels: ['secundaria'], email: 'paulina@cgb.edu.mx' },
+            { id: 32, name: "Miss Cecilia (Sustentabilidad)", gender: "F", levels: ['secundaria'], email: 'cecilia@cgb.edu.mx' },
+            { id: 33, name: "Arturo Palacios (Informática)", gender: "M", levels: ['secundaria'], email: 'sir.artorio@gmail.com' },
+
+            { id: 34, name: "Ing. Alejandro Soto (Física y Cálculo)", gender: "M", levels: ['bachillerato'], email: 'alejandro@cgb.edu.mx' },
+            { id: 35, name: "Dra. Carolina Martínez (Química y Biología)", gender: "F", levels: ['bachillerato'], email: 'carolina@cgb.edu.mx' },
+            { id: 36, name: "Mtra. Silvia Ortiz (Literatura y Filosofía)", gender: "F", levels: ['bachillerato'], email: 'silvia@cgb.edu.mx' },
+            { id: 37, name: "Prof. Ricardo Pérez (Historia y Geografía)", gender: "M", levels: ['bachillerato'], email: 'ricardo@cgb.edu.mx' },
+            { id: 38, name: "Lic. Carlos Fuentes (Derecho y Economía)", gender: "M", levels: ['bachillerato'], email: 'carlos@cgb.edu.mx' },
+            { id: 39, name: "Elena Rostova (Taller de Idiomas)", gender: "F", levels: ['bachillerato'], email: 'elena@cgb.edu.mx' },
+            { id: 40, name: "Dr. Humberto Solís (Ciencias de la Salud)", gender: "M", levels: ['bachillerato'], email: 'humberto@cgb.edu.mx' },
+            { id: 41, name: "Arturo Palacios (Cultura Digital)", gender: "M", levels: ['bachillerato'], email: 'sir.artorio@gmail.com' },
+
+            { id: 101, name: "Mtro. Salvador Herrera (Coordinador de Idiomas)", gender: "M", levels: ['coordinadores'], email: 'salvador@cgb.edu.mx' },
+            { id: 102, name: "Miss Mónica Espinoza (Coordinador de Primaria)", gender: "F", levels: ['coordinadores'], email: 'monica@cgb.edu.mx' },
+            { id: 103, name: "Prof. Diego Valenzuela (Coordinador de Deportes)", gender: "M", levels: ['coordinadores'], email: 'diego@cgb.edu.mx' },
+
+            { id: 201, name: "Mtra. Elizabeth Harrison (Director General)", gender: "F", levels: ['directores'], email: 'elizabeth.h@cgb.edu.mx' },
+            { id: 202, name: "Dr. Roberto Jenkins (Director de Secundaria y Bachillerato)", gender: "M", levels: ['directores'], email: 'roberto@cgb.edu.mx' },
+            { id: 203, name: "Miss Susan Carter (Director de Primaria)", gender: "F", levels: ['directores'], email: 'susan@cgb.edu.mx' }
+        ];
+
+        const SUBJECTS_BACHILLERATO = [
+            "Lenguaje y comunicación", "Matemáticas", "Cultura digital", "Conservación de la energía",
+            "Taller de ciencias", "Humanidades", "Química", "Espacio y sociedad", "Literatura",
+            "Ciencias sociales", "Filosofía", "Ecología", "Historia", "Derecho", "Psicología",
+            "Informática", "Cálculo", "Dibujo técnico", "Temas Selectos de Física", "Probabilidad y Estadística",
+            "Ciencias de la Salud", "Etimologías", "Temas Selectos de Química", "Temas Selectos de Biología",
+            "Administración", "Economía", "Matemáticas Financieras", "Francés",
+            "Biología", "Física", "Deportes" 
+        ];
+
+        const SUBJECTS_SECUNDARIA = [
+            "Español", "Matemáticas", "Biología", "Historia", "Formación cívica y ética",
+            "Informática", "Geografía", "Tutoría", "Oralidad", "Pintura", "Escultura",
+            "Música", "Danza", "Teatro", "Ecología - huerto", "Francés", "Inglés - Israel",
+            "Inglés - Saraí", "Inglés - Nadya", "Inglés - Zeidy", "Inglés - Brenda",
+            "Física", "Sustentabilidad", "Química", "Cultura Física - Diana",
+            "Cultura Física - Thania", "Cultura Física - Jorge", "Cultura Física - Ricardo"
+        ];
+
+        const SUBJECT_OPTIONS_BAJA = [
+            { label: 'Español', emoji: '📖' },
+            { label: 'Inglés', emoji: '🗣️' },
+            { label: 'Cultura Física', emoji: '⚽' },
+            { label: 'Música', emoji: '🎵' },
+            { label: 'Arte', emoji: '🎨' }
+        ];
+
+        const SUBJECT_OPTIONS_ALTA = [
+            { label: 'Español', emoji: '📖' },
+            { label: 'Inglés', emoji: '🗣️' },
+            { label: 'Cultura Física', emoji: '⚽' },
+            { label: 'Música', emoji: '🎵' },
+            { label: 'Escultura', emoji: '🗿' },
+            { label: 'Baile', emoji: '🩰' },
+            { label: 'Teatro', emoji: '🎭' }
+        ];
+
+        const MOCK_QUESTIONS = {
+            primaria_baja: [
+                { id: 1, type: 'faces', text: "1. Sí le entiendo a su clase y cuando me cuesta trabajo, me explica." },
+                { id: 2, type: 'faces', text: "2. La tarea que me deja se me hace fácil porque ya lo vi en clase." },
+                { id: 3, type: 'faces', text: "3. Sí me alcanza el tiempo para hacer la tarea." },
+                { id: 4, type: 'faces', text: "4. Califica los trabajos y tareas." },
+                { id: 5, type: 'faces', text: "5. Siempre está conmigo en el salón y me acompaña a mis actividades." },
+                { id: 6, type: 'faces', text: "6. Hacemos muchas cosas diferentes en la clase y me gustan." },
+                { id: 7, type: 'faces', text: "7. Me trata siempre con respeto." },
+                { id: 8, type: 'faces', text: "8. Me dice lo que tengo que estudiar más para mejorar y cómo voy en clase." },
+                { id: 9, type: 'faces', text: "9. Me invita a vivir los valores de honestidad, respeto, amistad, justicia y compromiso." },
+                { id: 10, type: 'subjects', text: "10. La clase que más me gusta es:", isGeneral: true, options: SUBJECT_OPTIONS_BAJA },
+                { id: 11, type: 'subjects', text: "11. La clase que no me gusta mucho es:", isGeneral: true, options: SUBJECT_OPTIONS_BAJA },
+                { id: 12, type: 'textarea', text: "12. Escribe algo que le quieras decir a uno de tus maestros o maestras.", isGeneral: true }
+            ],
+            primaria_alta: [
+                { id: 1, type: 'faces', text: "1. Sí le entiendo a su clase y cuando me cuesta trabajo, me explica." },
+                { id: 2, type: 'faces', text: "2. La tarea que me deja se me hace fácil porque ya lo vi en clase." },
+                { id: 3, type: 'faces', text: "3. Sí me alcanza el tiempo para hacer la tarea." },
+                { id: 4, type: 'faces', text: "4. Califica los trabajos y tareas." },
+                { id: 5, type: 'faces', text: "5. Siempre está conmigo en el salón y me acompaña a mis actividades." },
+                { id: 6, type: 'faces', text: "6. Hacemos muchas cosas diferentes en la clase y me gustan." },
+                { id: 7, type: 'faces', text: "7. Me trata siempre con respeto." },
+                { id: 8, type: 'faces', text: "8. Me dice lo que tengo que estudiar más para mejorar y cómo voy en clase." },
+                { id: 9, type: 'faces', text: "9. Me invita a vivir los valores de honestidad, respeto, amistad, justicia y compromiso." },
+                { id: 10, type: 'subjects', text: "10. La clase que más me gusta es:", isGeneral: true, options: SUBJECT_OPTIONS_ALTA },
+                { id: 11, type: 'subjects', text: "11. La clase que no me gusta mucho es:", isGeneral: true, options: SUBJECT_OPTIONS_ALTA },
+                { id: 12, type: 'textarea', text: "12. Escribe algo que le quieras decir a uno de tus maestros o maestras.", isGeneral: true }
+            ],
+            secundaria: [
+                { id: 1, type: 'sec_options', text: "1. ¿El profesor o profesora es puntual al inicio de todas sus clases?" },
+                { id: 2, type: 'sec_options', text: "2. ¿El profesor o profesora demuestra tener preparadas todas sus clases y dominar los temas que imparte?" },
+                { id: 3, type: 'sec_options', text: "3. ¿El profesor o profesora indica cada parcial los temas y los objetivos a trabajar, te explica qué se va a hacer en cada periodo y cómo se va a evaluar?" },
+                { id: 4, type: 'sec_options', text: "4. ¿El profesor o profesora deja tareas para reforzar lo visto en clase o preparar el siguiente aprendizaje y las revisa?" },
+                { id: 5, type: 'sec_options', text: "5. ¿El profesor o profesora es claro en todos los trabajos o tareas que asigna para atender los temas?" },
+                { id: 6, type: 'sec_options', text: "6. ¿El profesor o profesora aclara las dudas que surgen durante las clases, en tareas o trabajos?" },
+                { id: 7, type: 'sec_options', text: "7. ¿El profesor o profesora genera diferentes estrategias o actividades para atender los diferentes temas en clase?" },
+                { id: 8, type: 'sec_options', text: "8. ¿El profesor o profesora se dirige a los estudiantes con respeto y con buena actitud durante las clases o ante cualquier conflicto?" },
+                { id: 9, type: 'sec_options', text: "9. ¿Lo que pregunta el profesor o profesora en sus exámenes es lo que se vio en clases?" }
+            ],
+            bachillerato: [
+                { id: 1, type: 'sec_options', text: "1. ¿El profesor o profesora es puntual al inicio de todas sus clases?" },
+                { id: 2, type: 'sec_options', text: "2. ¿El profesor o profesora demuestra tener preparadas todas sus clases y dominar los temas que imparte?" },
+                { id: 3, type: 'sec_options', text: "3. ¿El profesor o profesora indica cada parcial los temas y los objetivos a trabajar, te explica qué se va a hacer en cada periodo y cómo se va a evaluar?" },
+                { id: 4, type: 'sec_options', text: "4. ¿El profesor o profesora deja tareas para reforzar lo visto en clase o preparar el siguiente aprendizaje y las revisa?" },
+                { id: 5, type: 'sec_options', text: "5. ¿El profesor o profesora es claro en todos los trabajos o tareas que asigna para atender los temas?" },
+                { id: 6, type: 'sec_options', text: "6. ¿El profesor o profesora aclara las dudas que surgen durante las clases, en tareas o trabajos?" },
+                { id: 7, type: 'sec_options', text: "7. ¿El profesor o profesora genera diferentes estrategias o actividades para atender los diferentes temas en clase?" },
+                { id: 8, type: 'sec_options', text: "8. ¿El profesor o profesora se dirige a los estudiantes con respeto y con buena actitud durante las clases o ante cualquier conflicto?" },
+                { id: 9, type: 'sec_options', text: "9. ¿Lo que pregunta el profesor o profesora en sus exámenes es lo que se vio en clases?" },
+                { id: 10, type: 'sec_options', text: "10. ¿La actitud del profesor es positiva para ti?" }
+            ],
+            coordinadores: [
+                { id: 1, type: 'numbers', text: "1. Ejerce su liderazgo, promoviendo positivamente las metas y objetivos de la institución a corto y largo plazo." },
+                { id: 2, type: 'numbers', text: "2. Promueve e impulsa el desarrollo del personal docente." },
+                { id: 3, type: 'numbers', text: "3. Demuestra su liderazgo en aspectos como dar confianza al personal, impulsar el trabajo en equipo y respetar las opiniones de los docentes." },
+                { id: 4, type: 'numbers', text: "4. Muestra conocimiento de todos los procesos importantes que ocurren en el departamento y se involucra en cada uno de ellos." },
+                { id: 5, type: 'numbers', text: "5. Se reúne con los maestros, entra a las aulas para conocer de manera directa cómo trabajan y apoya en cualquier duda o desventajas que el maestro pudiera tener." },
+                { id: 6, type: 'numbers', text: "6. Sostiene pláticas con los padres de familia con respecto a los aprendizajes de los alumnos." },
+                { id: 7, type: 'numbers', text: "7. Es el centro principal del proceso mediante el cual la sección logra niveles de resultados cada vez mejores." },
+                { id: 8, type: 'numbers', text: "8. Se preocupa por investigar si hay niveles bajos de aprendizaje y dónde están las fallas, brindando opciones de mejora." },
+                { id: 9, type: 'radio', text: "9. En este ciclo escolar, ¿en qué aspecto te ha apoyado más tu coordinador(a)?", options: [
+                    "Transmisión de indicaciones de las autoridades.",
+                    "Asesoría en aspectos normativos and administrativos.",
+                    "Mediación y resolución de conflictos.",
+                    "Apoyo en aspectos técnico pedagógicos.",
+                    "En ninguno."
+                ]},
+                { id: 10, type: 'radio', text: "10. ¿Cuál consideras es la mayor fortaleza del coordinador(a)?", options: [
+                    "Cumplimiento de lo que se lo solicita por parte de las autoridades institucionales.",
+                    "Tomar decisiones considerando la opinión de los docentes.",
+                    "Planeación de proyectos y eventos.",
+                    "Impulsa el trabajo colaborativo entre maestros y maestras.",
+                    "Capacidad de apoyo en la planeación de enseñanza y logro de aprendizaje.",
+                    "Seguimiento de procesos y proyectos educativos.",
+                    "Evaluación de procesos y proyectos educativos.",
+                    "Ninguna."
+                ]},
+                { id: 11, type: 'radio', text: "11. ¿Cuál consideras que es el área de oportunidad más grande del coordinador(a)?", options: [
+                    "Cumplimiento de lo que se lo solicita por parte de las autoridades institucionales.",
+                    "Tomar decisiones considerando la opinión de los docentes.",
+                    "Planeación de proyectos y eventos.",
+                    "Impulsa el trabajo colaborativo entre maestros y maestras.",
+                    "Capacidad de apoyo en la planeación de enseñanza y logro de aprendizaje.",
+                    "Seguimiento de procesos y proyectos educativos.",
+                    "Evaluación de procesos y proyectos educativos.",
+                    "Ninguna."
+                ]},
+                { id: 12, type: 'radio', text: "12. En lo pedagógico-organizativo, ¿qué consideras que debe realizar para impulsar la mejora?", options: [
+                    "Promover el desarrollo profesional de los maestros, esto es que estudien y se preparen más.",
+                    "Apoyar para que las clases sean mejores y más eficientes.",
+                    "Dar seguimiento y evaluar la enseñanza para que tenga efecto en el aprendizaje.",
+                    "Buscar apoyo para mejorar las estrategias de enseñanza.",
+                    "Asesorar en el buen uso del tiempo escolar."
+                ]},
+                { id: 13, type: 'textarea', text: "13. ¿Cómo es la relación que el(la) coordinador(a) tiene con el personal docente (en trato, respeto y cordialidad)?" },
+                { id: 14, type: 'textarea', text: "14. ¿Cómo es la relación que el(la) coordinador(a) tiene con la comunidad escolar (alumnos, padres de familia, personal en general)?" },
+                { id: 15, type: 'textarea', text: "15. Comentarios adicionales o sugerencias de mejora:" }
+            ],
+            directores: [
+                { id: 1, type: 'numbers', text: "1. Ejerce su liderazgo, promoviendo positivamente las metas y objetivos de la institución a corto y largo plazo." },
+                { id: 2, type: 'numbers', text: "2. Promueve e impulsa el desarrollo del personal docente." },
+                { id: 3, type: 'numbers', text: "3. Demuestra su liderazgo en aspectos como dar confianza al personal, impulsar el trabajo en equipo y respetar las opiniones de los docentes." },
+                { id: 4, type: 'numbers', text: "4. Muestra conocimiento de todos los procesos importantes que ocurren en la sección/colegio y se involucra en cada uno de ellos." },
+                { id: 5, type: 'numbers', text: "5. Se reúne con los maestros, entra a las aulas para conocer de manera directa cómo trabajan y apoya en cualquier duda o desventajas que el maestro pudiera tener." },
+                { id: 6, text: "6. Sostiene pláticas con los padres de familia con respecto a los aprendizajes de los alumnos.", type: 'numbers' },
+                { id: 7, type: 'numbers', text: "7. Es el centro principal del proceso mediante el cual la sección logra niveles de resultados cada vez mejores." },
+                { id: 8, text: "8. Se preocupa por investigar si hay niveles bajos de aprendizaje y dónde están las fallas, brindando opciones de mejora.", type: 'numbers' },
+                { id: 9, type: 'radio', text: "9. En este ciclo escolar, ¿en qué aspecto te ha apoyado más tu director(a)?", options: [
+                    "Transmisión de indicaciones de las autoridades institucionales y SEP.",
+                    "Asesoría en aspectos normativos y administrativos.",
+                    "Mediación y resolución de conflictos.",
+                    "Apoyo en aspectos técnico pedagógicos.",
+                    "En ninguno."
+                ]},
+                { id: 10, type: 'radio', text: "10. ¿Cuál consideras es la mayor fortaleza del director(a)?", options: [
+                    "Cumplimiento de lo que se lo solicita por parte de las autoridades institucionales y SEP.",
+                    "Tomar decisiones considerando la opinión de los docentes.",
+                    "Planeación de proyectos y eventos.",
+                    "Impulsa el trabajo colaborativo entre maestros y maestras.",
+                    "Capacidad de apoyo en la planeación de enseñanza y logro de aprendizaje.",
+                    "Seguimiento de procesos y proyectos educativos.",
+                    "Evaluación de procesos y proyectos educativos.",
+                    "Ninguna."
+                ]},
+                { id: 11, type: 'radio', text: "11. ¿Cuál consideras que es el área de oportunidad más grande del director(a)?", options: [
+                    "Cumplimiento de lo que se lo solicita por parte de las autoridades institucionales.",
+                    "Tomar decisiones considerando la opinión de los docentes.",
+                    "Planeación de proyectos y eventos.",
+                    "Impulsa el trabajo colaborativo entre maestros y maestras.",
+                    "Capacidad de apoyo en la planeación de enseñanza y logro de aprendizaje.",
+                    "Seguimiento de procesos y proyectos educativos.",
+                    "Evaluación de procesos y proyectos educativos.",
+                    "Ninguna."
+                ]},
+                { id: 12, type: 'radio', text: "12. En lo normativo y administrativo, ¿qué consideras que debe realizar para impulsar a la sección?", options: [
+                    "Absorber tareas administrativas que regularmente se le asignan a los maestros.",
+                    "Asegurar un buen control escolar.",
+                    "Asegurar la prestación regular del servicio educativo.",
+                    "Dar seguimiento y evaluar al personal.",
+                    "Nada, así estamos bien."
+                ]},
+                { id: 13, type: 'radio', text: "13. En lo pedagógico-organizativo, ¿qué consideras que debe realizar para impulsar la mejora?", options: [
+                    "Promover el desarrollo profesional de los maestros, esto es qué estudien y se preparen más.",
+                    "Apoyar para que las clases sean mejores y más eficientes.",
+                    "Dar seguimiento y evaluar la enseñanza para que tenga efecto en el aprendizaje.",
+                    "Buscar apoyo para mejorar las estrategias de enseñanza.",
+                    "Asesorar en el buen uso del tiempo escolar."
+                ]},
+                { id: 14, type: 'textarea', text: "14. ¿Cómo es la relación que el(la) director(a) tiene con el personal docente (en trato, respeto y cordialidad)?" },
+                { id: 15, type: 'textarea', text: "15. ¿Cómo es la relación que el(la) director(a) tiene con la comunidad escolar (alumnos, padres, personal en general)?" },
+                { id: 16, type: 'textarea', text: "16. Comentarios adicionales o sugerencias de mejora:" }
+            ]
+        };
+
+        const app = {
+            currentUser: null,
+            currentView: 'splash',
+            lastView: null,
+            selectedTeacher: null,
+            selectedTeachersSec: [],
+            currentSecTeacherIndex: 0,
+            hiddenTeachers: [],
+            evaluatedTeachers: [],
+            showCompletionCelebration: false,
+            hasSeenCelebration: false,
+            hasAnsweredGeneralQuestions: false,
+            adminFilterLevel: 'todos',
+            adminFilterTeacher: 'todos',
+            adminFilterGrade: 'todos',
+            adminFilterGroup: 'todos',
+            formResponses: {},
+            secAnswers: {},
+            activeCharts: {},
+            adminSubmissions: [],
+            isFetchingAdminData: false,
+            isConsoleExpanded: false,
+            debugLogs: [],
+            isSubmitting: false,
+            isConfigUnlocked: true,
+
+            async init() {
+                this.navigate('splash');
+                this.generateRealisticMockData();
+                await this.fetchInitialData();
+            },
+
+            navigate(view) {
+                this.currentView = view;
+                if (view === 'splash' || view === 'login' || view === 'form' || view === 'welcome') {
+                    this.isSubmitting = false;
+                }
+                this.render();
+            },
+
+            openConfigModal() {
+                this.isConfigUnlocked = true;
+                document.getElementById('config-modal').classList.remove('hidden');
+                this.renderConfigModalContent();
+            },
+
+            closeConfigModal() {
+                document.getElementById('config-modal').classList.add('hidden');
+            },
+
+            renderConfigModalContent() {
+                const modalBody = document.getElementById('config-modal-body');
+                if (!modalBody) return;
+                modalBody.innerHTML = `
+                    <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+                        <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+                            <i class="fas fa-plug text-primary"></i> Configuración de Conexión Google Sheets
+                        </h3>
+                        <button onclick="app.closeConfigModal()" class="text-slate-400 hover:text-slate-600">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <p class="text-xs text-slate-500 mb-4 leading-relaxed">
+                        Para conectar este portal con tu propia base de datos, ingresa la URL de la <strong>Aplicación Web (Web App)</strong> obtenida tras implementar el código <strong>.gs</strong> en tu hoja de cálculo: </p>
+                    <div class="mb-4">
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">URL de Google Apps Script (.exec)</label>
+                        <textarea id="config-api-url" rows="3" placeholder="https://script.google.com/macros/s/.../exec" class="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-primary focus:ring-1 focus:ring-primary text-xs font-mono">${GOOGLE_SHEETS_API_URL}</textarea>
+                    </div>
+                    <div class="flex justify-end gap-2">
+                        <button onclick="app.closeConfigModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all">Cancelar</button>
+                        <button onclick="app.saveConfig()" class="px-4 py-2 bg-primary hover:bg-blue-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5">
+                            <i class="fas fa-save"></i> Guardar y Conectar
+                        </button>
+                    </div>
+                `;
+                document.getElementById('config-api-url')?.focus();
+            },
+
+            saveConfig() {
+                const urlInput = document.getElementById('config-api-url').value.trim();
+                if (urlInput && !urlInput.startsWith('https://script.google.com/')) {
+                    showToast("La URL debe iniciar con https://script.google.com/", "error");
+                    return;
+                }
+                if (urlInput === "") {
+                    localStorage.removeItem('cgb_api_url');
+                    GOOGLE_SHEETS_API_URL = DEFAULT_API_URL;
+                    showToast("Configuración restaurada al valor por defecto", "info");
+                } else {
+                    localStorage.setItem('cgb_api_url', urlInput);
+                    GOOGLE_SHEETS_API_URL = urlInput;
+                    showToast("¡URL de Sheets guardada y configurada!", "success");
+                }
+                this.closeConfigModal();
+                this.fetchInitialData();
+            },
+
+            checkTeacherLevel(teacherLevels, userRole) {
+                if (!teacherLevels || !userRole) return false;
+                const cleanString = (str) => {
+                    if (!str) return "";
+                    return str.toLowerCase()
+                        .normalize("NFD")
+                        .replace(/[\u0300-\u036f]/g, "")
+                        .replace(/[^a-z0-9]/g, "");
+                };
+                const normUserRole = cleanString(userRole);
+                return teacherLevels.some(level => {
+                    if (!level) return false;
+                    const normLevel = cleanString(level);
+                    if (normLevel === normUserRole) return true;
+                    const singLevel = normLevel.endsWith('s') ? normLevel.slice(0, -1) : normLevel;
+                    const singUser = normUserRole.endsWith('s') ? normUserRole.slice(0, -1) : normUserRole;
+                    if (singLevel === singUser) return true;
+                    if (singLevel === "primaria" && (singUser === "primariabaja" || singUser === "primariaalta")) {
+                        return true;
+                    }
+                    if (normLevel.includes(normUserRole) || normUserRole.includes(normLevel)) {
+                        return true;
+                    }
+                    return false;
+                });
+            },
+
+            getTeacherCleanName(fullName) {
+                if (!fullName) return "";
+                const match = fullName.match(/^([^(]+)\s*\(([^)]+)\)/);
+                if (match) {
+                    return match[1].trim();
+                }
+                return fullName.trim();
+            },
+
+            getTeacherSubject(fullName) {
+                if (!fullName) return "Docente";
+                const match = fullName.match(/^([^(]+)\s*\(([^)]+)\)/);
+                if (match) {
+                    return match[2].trim();
+                }
+                return "Docente";
+            },
+
+            getTeacherInitials(name) {
+                if (!name) return "DOC";
+                let cleanName = this.getTeacherCleanName(name);
+                let clean = cleanName.replace(/^(Mr\.|Miss|Prof\.|Profe\.|Dr\.|Dra\.)\s+/i, '').trim();
+                let parts = clean.split(/\s+/);
+                let initials = "";
+                if (parts[0]) initials += parts[0][0];
+                if (parts[1]) initials += parts[1][0];
+                return initials.toUpperCase() || "CGB";
+            },
+
+            fetchWithTimeout(url, options = {}, timeout = 15000) {
+                const safeOptions = options === null ? {} : options;
+                return Promise.race([
+                    fetch(url, safeOptions),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout de red')), timeout))
+                ]);
+            },
+
+            generateRealisticMockData() {
+                MOCK_SUBMISSIONS = [];
+                const levels = ['primaria_baja', 'primaria_alta', 'secundaria', 'bachillerato', 'coordinadores', 'directores'];
+                const groups = ['grupo_41', 'grupo_42', 'grupo_51', 'grupo_52', 'grupo_61', 'grupo_62'];
+                const comments = [
+                    "Excelente labor en toda la gestión del semestre.",
+                    "Muy buena atención cuando le busco por dudas.",
+                    "Su comunicación es oportuna y empática.",
+                    "Organización excelente y trato muy respetuoso.",
+                    "Sabe escuchar sugerencias del equipo.",
+                    "Su mediación es oportuna y constructiva.",
+                    "Las explicaciones son muy amenas y de gran ayuda.",
+                    "La clase es excelente y muy dinámica."
+                ];
+                for (let i = 0; i < 60; i++) {
+                    const studentRole = levels[Math.floor(Math.random() * levels.length)];
+                    const teachersInLevel = FALLBACK_TEACHERS.filter(t => this.checkTeacherLevel(t.levels, studentRole));
+                    if (teachersInLevel.length === 0) continue;
+                    const teacher = teachersInLevel[Math.floor(Math.random() * teachersInLevel.length)];
+                    const group = studentRole === 'bachillerato' ? groups[Math.floor(Math.random() * groups.length)] : ['A', 'B', 'C'][Math.floor(Math.random() * 3)];
+                    let grade = "1º";
+                    if (studentRole === 'primaria_baja') grade = ['1º', '2º', '3º'][Math.floor(Math.random() * 3)];
+                    else if (studentRole === 'primaria_alta') grade = ['4º', '5º', '6º'][Math.floor(Math.random() * 3)];
+                    else if (studentRole === 'secundaria') grade = ['1º', '2º', '3º'][Math.floor(Math.random() * 3)];
+                    else if (studentRole === 'bachillerato') grade = ['Segundo Semestre', 'Cuarto Semestre', 'Sexto Semestre'][Math.floor(Math.random() * 3)];
+
+                    const responses = {};
+                    const questions = MOCK_QUESTIONS[studentRole];
+                    questions.forEach(q => {
+                        if (q.type === 'faces' || q.type === 'sec_options') {
+                            responses[q.id] = ['si', 'a_veces', 'no'][Math.floor(Math.random() * 3)];
+                        } else if (q.type === 'numbers') {
+                            responses[q.id] = Math.floor(Math.random() * 3) + 3;
+                        } else if (q.type === 'radio') {
+                            responses[q.id] = q.options[Math.floor(Math.random() * q.options.length)];
+                        } else if (q.type === 'textarea') {
+                            responses[q.id] = comments[Math.floor(Math.random() * comments.length)];
+                        }
+                    });
+
+                    if (studentRole === 'secundaria' || studentRole === 'bachillerato') {
+                        responses['aprendiMas'] = studentRole === 'secundaria' ? "Español, Matemáticas" : "Cálculo, Cultura digital";
+                        responses['clasesMejorar'] = studentRole === 'secundaria' ? "Francés, Pintura" : "Francés, Química";
+                        responses['comentarioLibre'] = comments[Math.floor(Math.random() * comments.length)];
+                    }
+
+                    MOCK_SUBMISSIONS.push({
+                        studentEmail: `evaluador.${i+1}@cgb.edu.mx`,
+                        studentRole: studentRole,
+                        studentGrade: grade,
+                        studentGroup: group,
+                        teacherId: teacher.id,
+                        teacherName: teacher.name,
+                        responses: responses,
+                        timestamp: new Date(Date.now() - Math.random() * 10 * 24 * 60 * 60 * 1000).toLocaleString('es-MX', { timeZone: 'America/Mexico_City' })
+                    });
+                }
+            },
+
+            async fetchInitialData() {
+                if (!GOOGLE_SHEETS_API_URL || GOOGLE_SHEETS_API_URL.trim() === '') {
+                    appTeachers = FALLBACK_TEACHERS;
+                    appSubmissions = [];
+                    showToast("Cargado en modo simulación local", "info");
+                    return;
+                }
+                const spinner = document.getElementById('loading-spinner');
+                if (spinner) spinner.classList.remove('hidden');
+                try {
+                    const response = await this.fetchWithTimeout(GOOGLE_SHEETS_API_URL + "?action=getInitialData", {}, 15000);
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        appTeachers = data.teachers || FALLBACK_TEACHERS;
+                        appEmails = data.emails || [];
+                        appEmailsLevels = data.emailsLevels || {};
+                        this.logDebug(`Datos iniciales sincronizados de Sheets. ${appTeachers.length} docentes leídos.`, 'success');
+                    } else {
+                        throw new Error(data.message || 'Error desconocido');
+                    }
+                } catch (err) {
+                    this.logDebug(`Error al descargar de Sheets: ${err.message}. Usando base local offline.`, 'error');
+                    appTeachers = FALLBACK_TEACHERS;
+                } finally {
+                    if (spinner) spinner.classList.add('hidden');
+                }
+            },
+
+            handleRoleChange() {
+                const role = document.getElementById('login-role').value;
+                const gradeGroupContainer = document.getElementById('grade-group-container');
+                const emailContainer = document.getElementById('email-container');
+                const passwordContainer = document.getElementById('password-container');
+                const extraFields = document.getElementById('primaria-baja-extra-fields');
+
+                gradeGroupContainer.classList.add('hidden');
+                emailContainer.classList.add('hidden');
+                passwordContainer.classList.add('hidden');
+                extraFields.classList.add('hidden');
+
+                if (!role) return;
+
+                if (role === 'admin') {
+                    passwordContainer.classList.remove('hidden');
+                } else if (role === 'coordinadores' || role === 'directores') {
+                    emailContainer.classList.remove('hidden');
+                } else {
+                    gradeGroupContainer.classList.remove('hidden');
+                    emailContainer.classList.remove('hidden');
+                    
+                    const gradeSelect = document.getElementById('login-grade');
+                    const groupSelect = document.getElementById('login-group');
+                    gradeSelect.innerHTML = '';
+                    groupSelect.innerHTML = '';
+
+                    if (role === 'primaria_baja') {
+                        extraFields.classList.remove('hidden');
+                        ['1º', '2º', '3º'].forEach(g => gradeSelect.innerHTML += `<option value="${g}">${g} de Primaria Baja</option>`);
+                        ['A', 'B', 'C'].forEach(g => groupSelect.innerHTML += `<option value="${g}">Grupo ${g}</option>`);
+                    } else if (role === 'primaria_alta') {
+                        ['4º', '5º', '6º'].forEach(g => gradeSelect.innerHTML += `<option value="${g}">${g} de Primaria Alta</option>`);
+                        ['A', 'B', 'C'].forEach(g => groupSelect.innerHTML += `<option value="${g}">Grupo ${g}</option>`);
+                    } else if (role === 'secundaria') {
+                        ['1º', '2º', '3º'].forEach(g => gradeSelect.innerHTML += `<option value="${g}">${g} de Secundaria</option>`);
+                        ['A', 'B', 'C'].forEach(g => groupSelect.innerHTML += `<option value="${g}">Grupo ${g}</option>`);
+                    } else if (role === 'bachillerato') {
+                        ['Segundo Semestre', 'Cuarto Semestre', 'Sexto Semestre'].forEach(g => gradeSelect.innerHTML += `<option value="${g}">${g}</option>`);
+                        ['grupo_41', 'grupo_42', 'grupo_51', 'grupo_52', 'grupo_61', 'grupo_62'].forEach(g => groupSelect.innerHTML += `<option value="${g}">${g.replace('grupo_','').split('').join(' ')}</option>`);
+                    }
+                }
+            },
+
+            processLogin() {
+                const role = document.getElementById('login-role').value;
+                if (!role) { showToast("Por favor selecciona un rol para ingresar", "error"); return; }
+
+                if (role === 'admin') {
+                    const pass = document.getElementById('login-password').value;
+                    if (pass === 'arturo2026' || pass === 'admin2026' || pass === 'DIR2026') {
+                        this.currentUser = { role: 'admin', email: 'admin@cgb.edu.mx' };
+                        showToast("Sesión iniciada como Administrador Principal", "success");
+                        this.navigate('admin');
+                    } else {
+                        showToast("Contraseña maestra de auditoría incorrecta", "error");
+                    }
+                    return;
+                }
+
+                let email = document.getElementById('login-email').value.trim().toLowerCase();
+                let grade = document.getElementById('login-grade')?.value || '';
+                let group = document.getElementById('login-group')?.value || '';
+                let studentName = document.getElementById('login-student-name')?.value.trim() || '';
+
+                if (role === 'primaria_baja' && studentName === '') {
+                    showToast("Por favor escribe tu nombre completo para continuar", "error");
+                    return;
+                }
+
+                if (email === '') {
+                    email = role === 'primaria_baja' ? `${studentName.toLowerCase().replace(/[^a-z]/g,'')}@cgb.edu.mx` : `anonimo.${Date.now()}@cgb.edu.mx`;
+                } else if (!email.includes('@')) {
+                    showToast("El formato del correo institucional no es válido", "error");
+                    return;
+                }
+
+                this.currentUser = { role, email, grade, group, name: studentName };
+                this.hiddenTeachers = [];
+                this.evaluatedTeachers = [];
+                this.formResponses = {};
+                this.secAnswers = {};
+                this.hasAnsweredGeneralQuestions = false;
+
+                showToast(`¡Bienvenido al portal CGB Evalúa!`, "success");
+                this.navigate('welcome');
+            },
+
+            logout() {
+                this.currentUser = null;
+                showToast("Sesión cerrada correctamente", "info");
+                this.navigate('login');
+            },
+
+            async fetchAdminData() {
+                if (this.isFetchingAdminData) return;
+                this.isFetchingAdminData = true;
+                const tbody = document.getElementById('admin-table-body');
+                if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="py-12 text-center text-slate-400 font-medium animate-pulse"><i class="fas fa-spinner animate-spin mr-2"></i> Descargando registros históricos en tiempo real...</td></tr>`;
+
+                if (!GOOGLE_SHEETS_API_URL || GOOGLE_SHEETS_API_URL.trim() === '') {
+                    setTimeout(() => {
+                        this.adminSubmissions = MOCK_SUBMISSIONS;
+                        this.isFetchingAdminData = false;
+                        this.renderAdminCharts();
+                    }, 1000);
+                    return;
+                }
+
+                try {
+                    const response = await this.fetchWithTimeout(GOOGLE_SHEETS_API_URL + "?action=getSubmissions", {}, 25000);
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        this.adminSubmissions = data.submissions || [];
+                        this.logDebug(`Sincronizados ${this.adminSubmissions.length} envíos históricos de Google Sheets.`, 'success');
+                    } else {
+                        throw new Error(data.message);
+                    }
+                } catch (err) {
+                    this.logDebug(`Error al leer envíos: ${err.message}. Usando simulación local en panel.`, 'error');
+                    this.adminSubmissions = MOCK_SUBMISSIONS;
+                } finally {
+                    this.isFetchingAdminData = false;
+                    this.renderAdminCharts();
+                }
+            },
+
+            updateAdminFilters() {
+                this.adminFilterLevel = document.getElementById('admin-filter-level')?.value || 'todos';
+                this.adminFilterTeacher = document.getElementById('admin-filter-teacher')?.value || 'todos';
+                this.adminFilterGrade = document.getElementById('admin-filter-grade')?.value || 'todos';
+                this.adminFilterGroup = document.getElementById('admin-filter-group')?.value || 'todos';
+                this.renderAdminCharts();
+            },
+
+            renderAdminCharts() {
+                const subs = this.adminSubmissions;
+                const filtered = subs.filter(s => {
+                    if (this.adminFilterLevel !== 'todos' && s.studentRole !== this.adminFilterLevel) return false;
+                    if (this.adminFilterTeacher !== 'todos' && String(s.teacherId) !== String(this.adminFilterTeacher)) return false;
+                    if (this.adminFilterGrade !== 'todos' && s.studentGrade !== this.adminFilterGrade) return false;
+                    if (this.adminFilterGroup !== 'todos' && s.studentGroup !== this.adminFilterGroup) return false;
+                    return true;
+                });
+
+                document.getElementById('total-evals-badge').innerText = filtered.length;
+
+                // --- SELECTORES DINÁMICOS CON PRESERVACIÓN DE SELECCIÓN ---
+                const teacherSelect = document.getElementById('admin-filter-teacher');
+                if (teacherSelect) {
+                    const prevTeacher = this.adminFilterTeacher;
+                    teacherSelect.innerHTML = '<option value="todos">[ Todos los Docentes ]</option>';
+                    const uniqueTeachers = {};
+                    subs.forEach(s => {
+                        if (this.adminFilterLevel === 'todos' || s.studentRole === this.adminFilterLevel) {
+                            uniqueTeachers[s.teacherId] = s.teacherName;
+                        }
+                    });
+                    Object.keys(uniqueTeachers).forEach(id => {
+                        teacherSelect.innerHTML += `<option value="${id}">${uniqueTeachers[id]}</option>`;
+                    });
+                    if (uniqueTeachers[prevTeacher] || prevTeacher === 'todos') {
+                        teacherSelect.value = prevTeacher;
+                        this.adminFilterTeacher = prevTeacher;
+                    } else {
+                        this.adminFilterTeacher = 'todos';
+                    }
+                }
+
+                const gradeSelect = document.getElementById('admin-filter-grade');
+                if (gradeSelect) {
+                    const prevGrade = this.adminFilterGrade;
+                    gradeSelect.innerHTML = '<option value="todos">[ Todos los Grados ]</option>';
+                    const uniqueGrades = [...new Set(subs.filter(s => this.adminFilterLevel === 'todos' || s.studentRole === this.adminFilterLevel).map(s => s.studentGrade))];
+                    uniqueGrades.sort().forEach(g => {
+                        gradeSelect.innerHTML += `<option value="${g}">${g}</option>`;
+                    });
+                    if (uniqueGrades.includes(prevGrade) || prevGrade === 'todos') {
+                        gradeSelect.value = prevGrade;
+                        this.adminFilterGrade = prevGrade;
+                    } else {
+                        this.adminFilterGrade = 'todos';
+                    }
+                }
+
+                const groupSelect = document.getElementById('admin-filter-group');
+                if (groupSelect) {
+                    const prevGroup = this.adminFilterGroup;
+                    groupSelect.innerHTML = '<option value="todos">[ Todos los Grupos ]</option>';
+                    const uniqueGroups = [...new Set(subs.filter(s => this.adminFilterLevel === 'todos' || s.studentRole === this.adminFilterLevel).map(s => s.studentGroup))];
+                    uniqueGroups.sort().forEach(g => {
+                        groupSelect.innerHTML += `<option value="${g}">${g.replace('grupo_','').toUpperCase()}</option>`;
+                    });
+                    if (uniqueGroups.includes(prevGroup) || prevGroup === 'todos') {
+                        groupSelect.value = prevGroup;
+                        this.adminFilterGroup = prevGroup;
+                    } else {
+                        this.adminFilterGroup = 'todos';
+                    }
+                }
+
+                // --- PARTICIPACIÓN Y AUDITORÍA POR ALUMNOS (AGRUPADO ÚNICO) ---
+                const tbody = document.getElementById('admin-table-body');
+                if (tbody) {
+                    tbody.innerHTML = '';
+                    if (filtered.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-400 font-medium">Ningún envío cumple con los filtros activos.</td></tr>`;
+                    } else {
+                        // Agrupar evaluaciones por alumno usando su correo como llave única
+                        const alumnosAgrupados = {};
+                        filtered.forEach(s => {
+                            const alumnoKey = s.studentEmail || 'anonimo';
+                            if (!alumnosAgrupados[alumnoKey]) {
+                                alumnosAgrupados[alumnoKey] = {
+                                    email: s.studentEmail,
+                                    role: s.studentRole,
+                                    grade: s.studentGrade,
+                                    group: s.studentGroup,
+                                    evaluaciones: []
+                                };
+                            }
+                            alumnosAgrupados[alumnoKey].evaluaciones.push(s);
+                        });
+
+                        Object.values(alumnosAgrupados).forEach((alumno, idx) => {
+                            const roleLabels = { 'primaria_baja': 'P. Baja', 'primaria_alta': 'P. Alta', 'secundaria': 'Secundaria', 'bachillerato': 'Bachillerato', 'coordinadores': 'Coord', 'directores': 'Dir' };
+                            
+                            // Fila principal del Alumno Único
+                            const row = document.createElement('tr');
+                            row.className = "border-b border-slate-100 hover:bg-slate-50/70 transition-colors font-medium text-slate-700";
+                            row.innerHTML = `
+                                <td class="py-3 px-4 text-xs font-semibold text-primary break-all">${alumno.email}</td>
+                                <td class="py-3 px-4 text-xs"><span class="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 rounded-md uppercase font-bold text-[10px]">${roleLabels[alumno.role] || alumno.role}</span></td>
+                                <td class="py-3 px-4 text-xs text-slate-500">${alumno.grade}</td>
+                                <td class="py-3 px-4 text-xs text-slate-500 font-mono">${alumno.group.replace('grupo_','').toUpperCase()}</td>
+                                <td class="py-3 px-4 text-xs text-right">
+                                    <button onclick="app.toggleAlumnoDetalle('${idx}')" class="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1.5 ml-auto">
+                                        <i class="fas fa-search-plus"></i> Ver ${alumno.evaluaciones.length} Evaluaciones
+                                    </button>
+                                </td>
+                            `;
+                            tbody.appendChild(row);
+
+                            // Fila de detalles oculta (Acordeón que no rompe la estética de la app)
+                            const detailRow = document.createElement('tr');
+                            detailRow.id = `alumno-detalle-${idx}`;
+                            detailRow.className = "hidden bg-slate-50/50 border-b border-slate-100";
+                            
+                            let eHTML = `<td colspan="5" class="py-4 px-6"><div class="space-y-3">`;
+                            alumno.evaluaciones.forEach((e, evIdx) => {
+                                // Construir el desglose de respuestas
+                                let respuestasFijas = [];
+                                let respuestasAbiertas = [];
+                                
+                                Object.entries(e.responses).forEach(([qId, val]) => {
+                                    if (qId === 'aprendiMas' || qId === 'clasesMejorar' || qId === 'comentarioLibre') {
+                                        let qLabel = qId === 'aprendiMas' ? 'Clases donde aprendió más' : qId === 'clasesMejorar' ? 'Clases a mejorar' : 'Comentario general';
+                                        respuestasAbiertas.push(`<strong>${qLabel}:</strong> ${val}`);
+                                    } else if (!isNaN(qId)) {
+                                        respuestasFijas.push(`<span class="bg-white px-2 py-0.5 border border-slate-200 rounded text-slate-600 font-mono text-[10px]">P${qId}: ${String(val).toUpperCase()}</span>`);
+                                    } else {
+                                        respuestasAbiertas.push(`<strong>${qId}:</strong> ${val}`);
+                                    }
+                                });
+
+                                eHTML += `
+                                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm text-xs leading-relaxed text-slate-600">
+                                        <div class="flex flex-wrap justify-between items-center border-b border-slate-100 pb-2 mb-2 gap-2">
+                                            <span class="font-bold text-slate-800 flex items-center gap-1.5"><i class="fas fa-chalkboard-teacher text-primary"></i> Evalúó a: ${e.teacherName}</span>
+                                            <span class="text-[10px] text-slate-400 font-mono"><i class="far fa-clock"></i> ${e.timestamp}</span>
+                                        </div>
+                                        <div class="mb-2">
+                                            <span class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Respuestas de Selección</span>
+                                            <div class="flex flex-wrap gap-1.5">${respuestasFijas.join('') || '<span class="italic text-slate-400">Ninguna</span>'}</div>
+                                        </div>
+                                        ${respuestasAbiertas.length > 0 ? `
+                                        <div>
+                                            <span class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Sección Abierta / Comentarios</span>
+                                            <div class="space-y-1 text-slate-700 font-sans">${respuestasAbiertas.map(ra => `<p class="pl-2 border-l-2 border-slate-200">${ra}</p>`).join('')}</div>
+                                        </div>` : ''}
+                                    </div>
+                                `;
+                            });
+                            eHTML += `</div></td>`;
+                            detailRow.innerHTML = eHTML;
+                            tbody.appendChild(detailRow);
+                        });
+                    }
+                }
+
+                // --- RENDERIZADO DE GRÁFICAS MÉTRICAS ---
+                let totalScore = 0;
+                let numericCount = 0;
+                let yesCount = 0;
+                let sometimesCount = 0;
+                let noCount = 0;
+
+                filtered.forEach(s => {
+                    Object.values(s.responses).forEach(val => {
+                        if (typeof val === 'number') {
+                            totalScore += val;
+                            numericCount++;
+                        } else if (typeof val === 'string') {
+                            let v = val.toLowerCase();
+                            if (v === 'si' || v === 'sí') yesCount++;
+                            else if (v === 'a_veces') sometimesCount++;
+                            else if (v === 'no') noCount++;
+                        }
+                    });
+                });
+
+                let averageGral = numericCount > 0 ? (totalScore / numericCount) : 4.4;
+                document.getElementById('metric-avg-score').innerText = averageGral.toFixed(2);
+                document.getElementById('metric-satisfaction').innerText = (yesCount + sometimesCount + noCount) > 0 
+                    ? Math.round(((yesCount + sometimesCount * 0.5) / (yesCount + sometimesCount + noCount)) * 100) + '%'
+                    : '88%';
+
+                this.renderChart('chart-satisfaction', 'doughnut', {
+                    labels: ['Excelente (Sí)', 'Regular (A veces)', 'Atención (No)'],
+                    datasets: [{
+                        data: [yesCount || 75, sometimesCount || 18, noCount || 7],
+                        backgroundColor: ['#10b981', '#f59e0b', '#dc2626'],
+                        borderWidth: 0
+                    }]
+                }, { cutout: '72%', plugins: { legend: { display: false } } });
+
+                const teacherAvgMap = {};
+                filtered.forEach(s => {
+                    let tScore = 0;
+                    let tCount = 0;
+                    Object.values(s.responses).forEach(v => {
+                        if (typeof v === 'number') { tScore += v; tCount++; }
+                        else if (typeof v === 'string') {
+                            let sV = v.toLowerCase();
+                            if (sV === 'si' || sV === 'sí') { tScore += 5; tCount++; }
+                            else if (sV === 'a_veces') { tScore += 3; tCount++; }
+                            else if (sV === 'no') { tScore += 1; tCount++; }
+                        }
+                    });
+                    if (tCount > 0) {
+                        if (!teacherAvgMap[s.teacherName]) teacherAvgMap[s.teacherName] = { sum: 0, count: 0 };
+                        teacherAvgMap[s.teacherName].sum += (tScore / tCount);
+                        teacherAvgMap[s.teacherName].count++;
+                    }
+                });
+
+                const tLabels = Object.keys(teacherAvgMap);
+                const tData = tLabels.map(l => (teacherAvgMap[l].sum / teacherAvgMap[l].count));
+
+                if (tLabels.length === 0) {
+                    tLabels.push("M. Brenda", "M. Nadya", "P. Jorge", "M. Sarai");
+                    tData.push(4.8, 4.5, 3.9, 4.2);
+                }
+
+                this.renderChart('chart-teachers-bar', 'bar', {
+                    labels: tLabels.map(l => this.getTeacherCleanName(l)),
+                    datasets: [{
+                        data: tData,
+                        backgroundColor: tData.map(v => v >= 4.0 ? '#3b82f6' : (v >= 3.0 ? '#f59e0b' : '#dc2626')),
+                        borderRadius: 8
+                    }]
+                }, {
+                    scales: { y: { min: 1, max: 5, grid: { display: false } }, x: { grid: { display: false } } },
+                    plugins: { legend: { display: false } }
+                });
+            },
+
+            toggleAlumnoDetalle(index) {
+                const el = document.getElementById(`alumno-detalle-${index}`);
+                if (el) {
+                    el.classList.toggle('hidden');
+                }
+            },
+
+            renderChart(canvasId, type, data, options = {}) {
+                const ctx = document.getElementById(canvasId);
+                if (!ctx) return;
+                if (this.activeCharts[canvasId]) {
+                    this.activeCharts[canvasId].destroy();
+                }
+                this.activeCharts[canvasId] = new Chart(ctx, {
+                    type: type,
+                    data: data,
+                    options: Object.assign({
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: true, position: 'bottom' } }
+                    }, options)
+                });
+            },
+
+            toggleDebugConsole() {
+                this.isConsoleExpanded = !this.isConsoleExpanded;
+                const body = document.getElementById('debug-console-body');
+                const chevron = document.getElementById('debug-chevron');
+                if (!body || !chevron) return;
+                if (this.isConsoleExpanded) {
+                    body.style.maxHeight = '240px';
+                    chevron.classList.add('rotate-180');
+                } else {
+                    body.style.maxHeight = '0px';
+                    chevron.classList.remove('rotate-180');
+                }
+            },
+
+            logDebug(msg, type = 'info') {
+                const timestamp = new Date().toLocaleTimeString();
+                this.debugLogs.push({ msg, type, timestamp });
+                this.renderDebugLogs();
+            },
+
+            clearDebugConsole() {
+                this.debugLogs = [];
+                this.renderDebugLogs();
+            },
+
+            renderDebugLogs() {
+                const output = document.getElementById('debug-log-output');
+                if (!output) return;
+                output.innerHTML = '';
+                if (this.debugLogs.length === 0) {
+                    output.innerHTML = `<div class="text-slate-400 text-xs italic text-center py-4">Consola vacía. No hay eventos registrados.</div>`;
+                    return;
+                }
+                this.debugLogs.forEach(log => {
+                    let badgeBg = 'bg-slate-100 text-slate-600 border-slate-200';
+                    let textClass = 'text-slate-600';
+                    let containerBg = 'bg-slate-50/50 border-slate-100';
+                    let label = 'INFO';
+                    if (log.type === 'error') {
+                        badgeBg = 'bg-rose-100 text-rose-700 border-rose-200';
+                        textClass = 'text-rose-700 font-semibold';
+                        containerBg = 'bg-rose-50/30 border-rose-100/50';
+                        label = 'ERROR';
+                    } else if (log.type === 'success') {
+                        badgeBg = 'bg-emerald-100 text-emerald-700 border-emerald-200';
+                        textClass = 'text-emerald-700 font-medium';
+                        containerBg = 'bg-emerald-50/30 border-emerald-100/50';
+                        label = 'ÉXITO';
+                    }
+                    output.innerHTML += `
+                        <div class="flex items-start gap-2.5 p-2 rounded-xl border ${containerBg} text-xs font-sans">
+                            <span class="text-[9px] font-mono text-slate-400 shrink-0 self-center">${log.timestamp}</span>
+                            <span class="px-1.5 py-0.5 border ${badgeBg} rounded-md text-[9px] font-extrabold uppercase tracking-wider shrink-0 self-center">${label}</span>
+                            <span class="leading-relaxed ${textClass}">${log.msg}</span>
+                        </div>
+                    `;
+                });
+                output.scrollTop = output.scrollHeight;
+            },
+
+            render() {
+                const container = document.getElementById('app-container');
+                const header = document.getElementById('main-header');
+                const userInfo = document.getElementById('user-info');
+                const previousScrollTop = container ? container.scrollTop : 0;
+                const previousWindowY = window.scrollY;
+                const viewChanged = this.currentView !== this.lastView;
+                this.lastView = this.currentView;
+                
+                container.innerHTML = '';
+
+                if (this.currentView === 'splash' || this.currentView === 'login') {
+                    header.classList.add('hidden');
+                } else {
+                    header.classList.remove('hidden');
+                }
+
+                switch(this.currentView) {
+                    case 'splash': container.innerHTML = this.views.splash(); break;
+                    case 'login': container.innerHTML = this.views.login(); break;
+                    case 'welcome': container.innerHTML = this.views.welcome(); break;
+                    case 'portal': container.innerHTML = this.views.portal(); break;
+                    case 'form': container.innerHTML = this.views.form(); break;
+                    case 'sec_final': container.innerHTML = this.views.sec_final(); break;
+                    case 'sec_thanks': container.innerHTML = this.views.sec_thanks(); break;
+                    case 'admin': 
+                        container.innerHTML = this.views.admin(); 
+                        if (this.adminSubmissions.length === 0) {
+                            this.fetchAdminData();
+                        } else {
+                            this.renderAdminCharts();
+                        }
+                        break;
+                }
+
+                if (viewChanged || this.currentView === 'form') {
+                    if (container) container.scrollTop = 0;
+                    window.scrollTo(0, 0);
+                } else {
+                    if (container) container.scrollTop = previousScrollTop;
+                    window.scrollTo(0, previousWindowY);
+                }
+
+                if (app.currentUser && this.currentView !== 'splash' && this.currentView !== 'sec_thanks') {
+                    userInfo.classList.remove('hidden');
+                    const roleNames = {
+                        'primaria_baja': 'Primaria Baja',
+                        'primaria_alta': 'Primaria Alta',
+                        'secundaria': 'Secundaria',
+                        'bachillerato': 'Bachillerato',
+                        'coordinadores': 'Docente (Coordinador)',
+                        'directores': 'Docente (Director)',
+                        'admin': 'Administrador'
+                    };
+                    document.getElementById('header-role').innerText = roleNames[app.currentUser.role] || app.currentUser.role;
+                    document.getElementById('header-email').innerText = app.currentUser.email || '';
+                } else {
+                    userInfo.classList.add('hidden');
+                }
+            },
+
+            views: {
+                splash: () => `
+                    <div class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-[#0b132b] via-[#1e3a8a] to-[#0f172a] overflow-hidden">
+                        <div class="absolute top-0 left-0 w-full h-full overflow-hidden opacity-35 pointer-events-none">
+                            <div class="absolute -top-24 -left-24 w-[30rem] h-[30rem] bg-blue-500 rounded-full mix-blend-screen filter blur-[100px] animate-pulse"></div>
+                            <div class="absolute top-1/2 -right-20 w-[25rem] h-[25rem] bg-orange-600 rounded-full mix-blend-screen filter blur-[120px] animate-pulse" style="animation-delay: 2s;"></div>
+                        </div>
+                        <div class="relative z-10 flex flex-col items-center px-4 w-full animate-scaleUp">
+                            <div class="w-64 sm:w-80 md:w-96 mb-8 animate-pulseGlow">
+                                <img src="guardianes.png" alt="Guardianes CGB" class="w-full h-auto object-contain drop-shadow-2xl" onerror="this.src='https://placehold.co/400x450/1e3a8a/ffffff?text=CGB+Evalua'">
+                            </div>
+                            <h1 class="text-3xl sm:text-5xl font-extrabold text-white mb-2 tracking-widest text-center drop-shadow-lg flex items-center justify-center gap-3"> PORTAL DE EVALUACIÓN <span class="text-xs bg-[#dc2626] text-white px-2 py-1 rounded font-mono uppercase tracking-normal select-none shadow-[0_0_15px_rgba(220,38,38,0.7)] font-extrabold">v6.0.2</span> </h1>
+                            <p class="text-blue-200 text-lg sm:text-xl mb-10 font-light tracking-[0.2em] text-center uppercase"> Colegio Gran Bretaña </p>
+                            <div class="flex flex-col items-center gap-1.5 mb-10 scale-95 opacity-90">
+                                <div class="flex items-center gap-2 text-slate-400 text-xs tracking-wider">
+                                    <span class="text-[10px] font-mono tracking-widest uppercase bg-white/5 border border-white/10 text-slate-300 px-2 py-0.5 rounded backdrop-blur-sm">Architect</span>
+                                    <span>L.I.E. Arturo Palacios González</span>
+                                </div>
+                                <span class="text-[9px] text-blue-400 font-mono uppercase tracking-[0.3em]">Innovación Tecnológica — CGB</span>
+                            </div>
+                            <button onclick="app.navigate('login')" class="group relative px-10 py-4 bg-transparent overflow-hidden rounded-full border border-white/50 text-white font-bold text-lg tracking-widest uppercase hover:border-white hover:shadow-[0_0_20px_rgba(255,255,255,0.3)] transition-all duration-300">
+                                <div class="absolute inset-0 w-0 bg-white transition-all duration-[400ms] ease-out group-hover:w-full"></div>
+                                <span class="relative group-hover:text-primary transition-colors duration-300 flex items-center gap-3"> Ingresar <i class="fas fa-chevron-right transform group-hover:translate-x-2 transition-transform"></i> </span>
+                            </button>
+                        </div>
+                    </div>
+                `,
+                login: () => `
+                    <div class="max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden mt-12 md:mt-20 p-1 relative border border-slate-100 animate-scaleUp">
+                        <div class="bg-primary p-6 text-center text-white rounded-t-2xl">
+                            <i class="fas fa-user-circle text-5xl mb-3"></i>
+                            <h2 class="text-2xl font-bold">Selección de Perfil</h2>
+                            <p class="text-blue-200 text-sm mt-1">Elige tus datos para comenzar</p>
+                        </div>
+                        <div class="p-6">
+                            <div class="mb-4">
+                                <div class="flex justify-between items-center mb-1">
+                                    <label class="block text-sm font-medium text-gray-700">Nivel Educativo o Rol</label>
+                                    <span class="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded flex items-center gap-1"> <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> ${GOOGLE_SHEETS_API_URL === DEFAULT_API_URL ? 'Default' : 'Custom SS'} </span>
+                                </div>
+                                <select id="login-role" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary p-2.5 border outline-none bg-white font-medium" onchange="app.handleRoleChange()">
+                                    <option value="" disabled selected>Selecciona tu perfil...</option>
+                                    <option value="primaria_baja">🎈 Primaria Baja (1º a 3º)</option>
+                                    <option value="primaria_alta">🎒 Primaria Alta (4º a 6º)</option>
+                                    <option value="secundaria">🏫 Secundaria</option>
+                                    <option value="bachillerato">🎓 Bachillerato</option>
+                                    <option value="coordinadores">👔 Coordinadores (Evaluado por Docentes)</option>
+                                    <option value="directores">💼 Directores (Evaluado por Docentes)</option>
+                                    <option value="admin">🔑 Administrador (Resultados)</option>
+                                </select>
+                            </div>
+                            <div id="primaria-baja-extra-fields" class="mb-4 hidden p-4 bg-orange-50/60 rounded-xl border border-orange-100">
+                                <label class="block text-xs font-extrabold uppercase text-orange-800 mb-1.5">Escribe tu Nombre y Apellidos ✍️</label>
+                                <input type="text" id="login-student-name" placeholder="Tu nombre completo..." class="w-full bg-white border border-orange-200 rounded-lg px-3.5 py-2.5 text-slate-700 font-semibold focus:ring-2 focus:ring-orange-400 outline-none text-sm shadow-sm">
+                            </div>
+                            <div id="grade-group-container" class="grid grid-cols-2 gap-4 mb-4 hidden">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Grado / Semestre</label>
+                                    <select id="login-grade" class="w-full border-gray-300 rounded-lg p-2.5 border outline-none bg-white font-medium"> </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Grupo</label>
+                                    <select id="login-group" class="w-full border-gray-300 rounded-lg p-2.5 border outline-none bg-white font-medium"> </select>
+                                </div>
+                            </div>
+                            <div id="email-container" class="mb-6 hidden">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Correo Institucional / de Acceso</label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <i class="fas fa-envelope text-gray-400"></i>
+                                    </div>
+                                    <input type="email" id="login-email" placeholder="tu.nombre@cgb.edu.mx" class="w-full pl-10 border-gray-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary p-2.5 border outline-none">
+                                </div>
+                            </div>
+                            <div id="password-container" class="mb-6 hidden">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña de Administrador</label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <i class="fas fa-lock text-gray-400"></i>
+                                    </div>
+                                    <input type="password" id="login-password" placeholder="••••••••" class="w-full pl-10 border-gray-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary p-2.5 border outline-none">
+                                </div>
+                                <div class="mt-3 text-[11px] leading-relaxed text-slate-500 bg-blue-50/75 p-3 rounded-xl border border-blue-100/50 flex gap-2.5 items-start">
+                                    <i class="fas fa-info-circle text-primary mt-0.5 text-xs shrink-0"></i> <span> <strong>Acceso Simplificado:</strong> El campo de correo es opcional. Puedes ingresar directamente con tu contraseña maestra (ej. <code>arturo2026</code>, <code>admin2026</code> o <code>DIR2026</code>). </span>
+                                </div>
+                            </div>
+                            <button onclick="app.processLogin()" class="w-full bg-primary hover:bg-blue-800 text-white font-semibold py-2.5 rounded-lg shadow transition-colors flex items-center justify-center gap-2"> Continuar <i class="fas fa-arrow-right"></i> </button>
+                        </div>
+                    </div>
+                `,
+                admin: () => `
+                    <div class="space-y-6 md:space-y-8 animate-scaleUp">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm relative overflow-hidden">
+                            <div class="absolute top-0 left-0 w-1.5 h-full bg-primary"></div>
+                            <div>
+                                <h2 class="text-2xl font-black tracking-tight text-slate-800 flex items-center gap-2">
+                                    <i class="fas fa-chart-line text-primary"></i> Consola Central de Auditoría
+                                </h2>
+                                <p class="text-slate-400 text-xs mt-1">Monitoreo multidimensional de evaluaciones y registros de participación.</p>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <button onclick="app.openConfigModal()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-200">
+                                    <i class="fas fa-cog"></i> Configurar API
+                                </button>
+                                <button onclick="app.fetchAdminData()" class="px-4 py-2 bg-primary hover:bg-blue-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5">
+                                    <i class="fas fa-sync-alt"></i> Sincronizar Base
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div>
+                                <label class="block text-[11px] font-extrabold uppercase tracking-wider text-slate-400 mb-1.5">Sección / Nivel</label>
+                                <select id="admin-filter-level" onchange="app.updateAdminFilters()" class="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:border-primary font-medium bg-white">
+                                    <option value="todos">[ Todos los Niveles ]</option>
+                                    <option value="primaria_baja">Primaria Baja</option>
+                                    <option value="primaria_alta">Primaria Alta</option>
+                                    <option value="secundaria">Secundaria</option>
+                                    <option value="bachillerato">Bachillerato</option>
+                                    <option value="coordinadores">Coordinadores</option>
+                                    <option value="directores">Directores</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-extrabold uppercase tracking-wider text-slate-400 mb-1.5">Docente Evaluado</label>
+                                <select id="admin-filter-teacher" onchange="app.updateAdminFilters()" class="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:border-primary font-medium bg-white">
+                                    <option value="todos">[ Todos los Docentes ]</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-extrabold uppercase tracking-wider text-slate-400 mb-1.5">Grado Escolar</label>
+                                <select id="admin-filter-grade" onchange="app.updateAdminFilters()" class="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:border-primary font-medium bg-white">
+                                    <option value="todos">[ Todos los Grados ]</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-extrabold uppercase tracking-wider text-slate-400 mb-1.5">Grupo</label>
+                                <select id="admin-filter-group" onchange="app.updateAdminFilters()" class="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:border-primary font-medium bg-white">
+                                    <option value="todos">[ Todos los Grupos ]</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-xl bg-blue-50 text-primary flex items-center justify-center text-xl shrink-0 border border-blue-100">
+                                    <i class="fas fa-clipboard-check"></i>
+                                </div>
+                                <div>
+                                    <span class="block text-slate-400 text-[11px] font-extrabold uppercase tracking-wider">Muestra Recabada</span>
+                                    <span id="total-evals-badge" class="text-2xl font-black text-slate-800 tracking-tight">0</span>
+                                </div>
+                            </div>
+                            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl shrink-0 border border-emerald-100">
+                                    <i class="fas fa-star"></i>
+                                </div>
+                                <div>
+                                    <span class="block text-slate-400 text-[11px] font-extrabold uppercase tracking-wider">Promedio General</span>
+                                    <span id="metric-avg-score" class="text-2xl font-black text-slate-800 tracking-tight">0.00</span>
+                                </div>
+                            </div>
+                            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl shrink-0 border border-amber-100">
+                                    <i class="fas fa-smile"></i>
+                                </div>
+                                <div>
+                                    <span class="block text-slate-400 text-[11px] font-extrabold uppercase tracking-wider">Índice Aceptación</span>
+                                    <span id="metric-satisfaction" class="text-2xl font-black text-slate-800 tracking-tight">0%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm lg:col-span-2 flex flex-col min-h-[300px]">
+                                <h3 class="font-bold text-sm text-slate-700 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2 flex items-center gap-2">
+                                    <i class="fas fa-chart-bar text-primary"></i> Desempeño Promedio Comparativo por Docente
+                                </h3>
+                                <div class="flex-grow relative h-64">
+                                    <canvas id="chart-teachers-bar"></canvas>
+                                </div>
+                            </div>
+                            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col min-h-[300px]">
+                                <h3 class="font-bold text-sm text-slate-700 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2 flex items-center gap-2">
+                                    <i class="fas fa-chart-pie text-success"></i> Distribución de Satisfacción
+                                </h3>
+                                <div class="flex-grow relative h-64 flex items-center justify-center">
+                                    <canvas id="chart-satisfaction"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                            <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <h3 class="font-bold text-sm text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                                    <i class="fas fa-users-cog text-primary"></i> Registro de Participación y Auditoría por Alumnos
+                                </h3>
+                                <span class="text-xs text-slate-400 font-medium">Lista de alumnos únicos con desglose expandible de evaluaciones</span>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="bg-slate-100 border-b border-slate-200 text-slate-500 uppercase tracking-wider text-[10px] font-extrabold select-none">
+                                            <th class="py-3 px-4">Alumno (Correo Institucional)</th>
+                                            <th class="py-3 px-4">Sección</th>
+                                            <th class="py-3 px-4">Grado</th>
+                                            <th class="py-3 px-4">Grupo</th>
+                                            <th class="py-3 px-4 text-right">Acciones de Control</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="admin-table-body" class="divide-y divide-slate-100">
+                                        </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-900 rounded-2xl border border-slate-800 shadow-xl overflow-hidden font-mono flex flex-col transition-all">
+                            <div onclick="app.toggleDebugConsole()" class="p-4 bg-slate-950/80 flex items-center justify-between text-slate-300 select-none cursor-pointer border-b border-slate-800">
+                                <div class="flex items-center gap-2 text-xs font-bold tracking-wider">
+                                    <span class="w-2 h-2 rounded-full bg-blue-500 animate-ping"></span>
+                                    <i class="fas fa-terminal text-blue-400"></i> CONSOLA CORE INTEGRAL DE LOGS
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <button onclick="event.stopPropagation(); app.clearDebugConsole()" class="text-[10px] bg-slate-800 px-2 py-0.5 rounded border border-slate-700 text-slate-400 hover:text-white transition-colors">Limpiar</button>
+                                    <i id="debug-chevron" class="fas fa-chevron-up text-xs transition-transform duration-300"></i>
+                                </div>
+                            </div>
+                            <div id="debug-console-body" class="max-h-0 overflow-y-auto transition-all duration-300 bg-slate-900/40">
+                                <div id="debug-log-output" class="p-4 space-y-2 max-h-60 overflow-y-auto flex flex-col">
+                                    </div>
+                            </div>
+                        </div>
+                    </div>
+                `,
+                welcome: () => {
+                    const role = app.currentUser.role;
+                    const isSecOrBach = role === 'secundaria' || role === 'bachillerato';
+                    const isDirectivos = role === 'coordinadores' || role === 'directores';
+                    if (isSecOrBach) {
+                        return `
+                            <div class="max-w-3xl mx-auto py-6 px-4 animate-scaleUp">
+                                <div class="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
+                                    <div class="bg-gradient-to-r from-primary via-blue-700 to-secondary p-8 text-white text-center relative">
+                                        <div class="w-24 h-24 mx-auto mb-4 bg-white/10 p-2 rounded-2xl border border-white/20 flex items-center justify-center backdrop-blur-sm">
+                                            <svg class="w-16 h-16 text-white" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M12 3L1 9L12 15L21 10.1V17H23V9L12 3Z"/>
+                                                <path d="M4.3 12.3V17.5C4.3 19 7.7 20.2 12 20.2C16.3 20.2 19.7 19 19.7 17.5V12.3L12 16.2L4.3 12.3Z"/>
+                                            </svg>
+                                        </div>
+                                        <h2 class="text-3xl font-extrabold tracking-wide">EVALUACIÓN DOCENTE</h2>
+                                        <p class="text-blue-100 text-sm font-semibold tracking-widest mt-1 uppercase">Sección ${role.toUpperCase()} — 2025-2026B</p>
+                                    </div>
+                                    <div class="p-8 space-y-6">
+                                        <div class="border-b border-slate-100 pb-4">
+                                            <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2"> <i class="fas fa-file-alt text-primary"></i> Instrucciones de Evaluación Libre </h3>
+                                            <p class="text-slate-500 text-sm mt-1">Por favor, lee detalladamente el nuevo flujo libre antes de iniciar:</p>
+                                        </div>
+                                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col h-full">
+                                                <div class="w-10 h-10 rounded-full bg-blue-100 text-primary flex items-center justify-center font-bold text-lg mb-4">1</div>
+                                                <h4 class="font-bold text-slate-800 text-sm mb-1">Elige tus Profesores</h4>
+                                                <p class="text-slate-500 text-xs leading-relaxed">Selecciona libremente a los docentes que te imparten clase en este periodo.</p>
+                                            </div>
+                                            <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col h-full">
+                                                <div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-lg mb-4">2</div>
+                                                <h4 class="font-bold text-slate-800 text-sm mb-1">Responde con Honestidad</h4>
+                                                <p class="text-slate-500 text-xs leading-relaxed">Contesta el cuestionario de 9 preguntas para cada uno con total objetividad.</p>
+                                            </div>
+                                            <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col h-full">
+                                                <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-lg mb-4">3</div>
+                                                <h4 class="font-bold text-slate-800 text-sm mb-1">Preguntas Generales</h4>
+                                                <p class="text-slate-500 text-xs leading-relaxed">Al terminar de evaluarlos, responde el bloque de retroalimentación libre final.</p>
+                                            </div>
+                                        </div>
+                                        <div class="pt-6">
+                                            <button onclick="app.startFreeSelectionPortal()" class="w-full bg-primary hover:bg-blue-800 text-white font-bold py-4 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 tracking-wide text-lg">
+                                                Comenzar Selección Libre <i class="fas fa-play"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    return `
+                        <div class="max-w-2xl mx-auto bg-white rounded-3xl shadow-xl overflow-hidden mt-6 md:mt-12 border border-slate-100 animate-scaleUp">
+                            <div class="bg-gradient-to-br from-primary to-blue-700 p-8 text-center text-white relative">
+                                <i class="fas fa-shield-alt text-6xl mb-4 text-accent animate-pulse"></i>
+                                <h2 class="text-3xl font-extrabold tracking-tight">Bienvenido al Portal Oficial</h2>
+                                <p class="text-blue-100 text-sm mt-2 font-medium">Tu opinión construye el futuro del Colegio Gran Bretaña</p>
+                            </div>
+                            <div class="p-8 space-y-6">
+                                <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100 text-slate-600 text-sm leading-relaxed space-y-3">
+                                    <p class="font-semibold text-slate-800 flex items-center gap-2 text-base">
+                                        <i class="fas fa-info-circle text-primary"></i> Lineamientos Importantes:
+                                    </p>
+                                    <div class="flex gap-3 items-start"><i class="fas fa-check text-emerald-500 mt-1"></i><span>Esta evaluación es completamente <strong>confidencial y segura</strong>. Los resultados se procesan de forma global agregada por el departamento de Innovación.</span></div>
+                                    <div class="flex gap-3 items-start"><i class="fas fa-check text-emerald-500 mt-1"></i><span>Por favor responde con total <strong>honestidad, respeto y objetividad</strong> profesional.</span></div>
+                                    <div class="flex gap-3 items-start"><i class="fas fa-check text-emerald-500 mt-1"></i><span>Evalúa conforme al desempeño observado a lo largo de todo este ciclo escolar.</span></div>
+                                </div>
+                                <button onclick="app.startEvaluationFlow()" class="w-full bg-primary hover:bg-blue-800 text-white font-bold py-3.5 rounded-xl shadow-lg transition-colors flex items-center justify-center gap-2 text-base tracking-wide">
+                                    Iniciar Proceso de Cuestionarios <i class="fas fa-arrow-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                },
+                portal: () => ``,
+                form: () => ``,
+                sec_final: () => ``,
+                sec_thanks: () => ``
+            },
+
+            startFreeSelectionPortal() { showToast("Cargando portal de profesores...", "info"); },
+            startEvaluationFlow() { showToast("Iniciando flujo de cuestionarios...", "info"); }
+        };
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgColors = { success: 'bg-emerald-600', error: 'bg-rose-600', info: 'bg-slate-800' };
+            const icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', info: 'fa-info-circle' };
+            toast.className = `${bgColors[type] || bgColors.info} text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-semibold toast-enter pointer-events-auto`;
+            toast.innerHTML = `<i class="fas ${icons[type] || icons.info} text-base"></i><span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.remove('toast-enter');
+                toast.classList.add('toast-exit');
+                setTimeout(() => { toast.remove(); }, 310);
+            }, 3500);
+        }
+
+        window.onload = function () {
+            app.init();
+        };
+    </script>
+</body>
+</html>
