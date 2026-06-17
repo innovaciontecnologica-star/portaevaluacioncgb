@@ -1,0 +1,1903 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal de Evaluación - CGB v6.0.0 (Gold Release)</title>
+    <!-- Tailwind CSS para diseño moderno -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Iconos de FontAwesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Fuente Inter de Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght=300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Chart.js para el Dashboard interactivo -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        primary: '#1e40af', // Azul CGB
+                        secondary: '#3b82f6', // Azul Eléctrico
+                        accent: '#dc2626', // Rojo Carmín CGB
+                        success: '#10b981', // Verde Esmeralda
+                        warning: '#f59e0b', // Ámbar Cálido
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at top right, #f8fafc, #e2e8f0);
+            min-height: 100vh;
+        }
+        /* Efectos y animaciones premium */
+        .glass {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+        .glass-dark {
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(51, 65, 85, 0.5);
+        }
+        /* Animación para los Diamonds (Rombos) rotados a 45 grados */
+        .diamond-pulse {
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .diamond-pulse:hover {
+            transform: rotate(45deg) scale(1.15);
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.6);
+        }
+        .diamond-active {
+            transform: rotate(45deg) scale(1.1);
+            background: #1e40af !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 20px rgba(30, 64, 175, 0.8);
+        }
+        /* Confeti animado por CSS para Bretax */
+        .confetti {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: #3b82f6;
+            border-radius: 50%;
+            animation: confetti-fall 3s linear infinite;
+        }
+        @keyframes confetti-fall {
+            0% { transform: translateY(-50px) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+        }
+        /* Animación de brinco de Bretax */
+        @keyframes bretax-bounce {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-15px) scale(1.03); }
+        }
+        .bretax-celebrate {
+            animation: bretax-bounce 2s ease-in-out infinite;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        /* Transiciones de Toasts */
+        .toast-enter {
+            animation: slide-in 0.3s ease-out forwards;
+        }
+        .toast-exit {
+            animation: slide-out 0.3s ease-in forwards;
+        }
+        @keyframes slide-in {
+            from { transform: translateY(100%) scale(0.9); opacity: 0; }
+            to { transform: translateY(0) scale(1); opacity: 1; }
+        }
+        @keyframes slide-out {
+            from { transform: translateY(0) scale(1); opacity: 1; }
+            to { transform: translateY(100%) scale(0.9); opacity: 0; }
+        }
+    </style>
+</head>
+<body class="relative overflow-x-hidden text-slate-800 flex flex-col min-h-screen">
+
+    <!-- Indicador de Carga Global -->
+    <div id="loading-spinner" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex flex-col items-center justify-center gap-4 hidden">
+        <div class="relative w-20 h-20">
+            <div class="absolute inset-0 border-4 border-slate-700 rounded-full"></div>
+            <div class="absolute inset-0 border-4 border-t-blue-600 rounded-full animate-spin"></div>
+        </div>
+        <p class="text-white font-bold text-lg tracking-wide animate-pulse">Sincronizando información con la nube...</p>
+    </div>
+
+    <!-- Contenedor Principal de la App -->
+    <div id="app-container" class="flex-grow w-full max-w-7xl mx-auto px-4 py-6 md:py-10 flex flex-col">
+        <!-- El contenido dinámico se inyectará aquí a través de JavaScript -->
+    </div>
+
+    <!-- Contenedor de Toasts (Notificaciones) -->
+    <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 max-w-md w-full pointer-events-none"></div>
+
+    <script>
+        // ==========================================
+        //  CONFIGURACIÓN CENTRAL DE LA APLICACIÓN
+        // ==========================================
+        // URL base de conexión en caliente (prioriza localStorage si existe)
+        const DEFAULT_SHEETS_URL = "";
+        let GOOGLE_SHEETS_API_URL = localStorage.getItem("CGB_API_URL") || DEFAULT_SHEETS_URL;
+
+        // Base de Datos Estructural del Colegio Gran Bretaña
+        const CGB_DATABASE = {
+            roles: {
+                "primaria_baja": { title: "🏫 Primaria Baja", subtitle: "1º a 3º de Primaria" },
+                "primaria_alta": { title: "🎨 Primaria Alta", subtitle: "4º a 6º de Primaria" },
+                "secundaria": { title: "🚀 Secundaria", subtitle: "7º a 9º de Secundaria" },
+                "bachillerato": { title: "🎓 Bachillerato", subtitle: "10º a 12º de Bachillerato" },
+                "coordinadores": { title: "📈 Coordinación", subtitle: "Evaluación de Coordinadores" },
+                "directores": { title: "👑 Dirección", subtitle: "Evaluación de Directivos" },
+                "admin": { title: "🔑 Administrador", subtitle: "Consola de Inteligencia" }
+            },
+            grados: {
+                "primaria_baja": ["1º Primaria", "2º Primaria", "3º Primaria"],
+                "primaria_alta": ["4º Primaria", "5º Primaria", "6º Primaria"],
+                "secundaria": ["7º Secundaria", "8º Secundaria", "9º Secundaria"],
+                "bachillerato": ["10º Bachillerato", "11º Bachillerato", "12º Bachillerato"],
+                "coordinadores": ["Coordinación Académica"],
+                "directores": ["Dirección General"]
+            },
+            grupos: {
+                "primaria_baja": ["A", "B", "C"],
+                "primaria_alta": ["A", "B", "C"],
+                "secundaria": ["A", "B", "C"],
+                "bachillerato": ["A", "B", "C"],
+                "coordinadores": ["Único"],
+                "directores": ["Único"]
+            },
+            docentes: {
+                "primaria_baja": ["Miss Caro", "Miss Paty", "Miss Fer", "Teacher John", "Profe Carlos"],
+                "primaria_alta": ["Miss Laura", "Miss Ana", "Teacher David", "Profe Luis", "Miss Karen"],
+                "secundaria": ["Ariadna", "Efraín", "Humberto", "Lizbeth", "Maru", "Noé", "Ricardo", "Víctor", "Karina", "Lourdes"],
+                "bachillerato": ["Ariadna", "Efraín", "Humberto", "Lizbeth", "Maru", "Noé", "Ricardo", "Víctor", "Karina", "Lourdes"],
+                "coordinadores": ["Coordinador Académico General", "Coordinadora de Idiomas"],
+                "directores": ["Director de Plantel", "Directora Administrativa"]
+            },
+            preguntas: {
+                "primaria_baja": [
+                    { id: "P1", text: "¿El maestro es amable y te trata con respeto?" },
+                    { id: "P2", text: "¿Las clases del maestro son divertidas y te gustan?" },
+                    { id: "P3", text: "¿El maestro te explica con paciencia cuando no entiendes algo?" }
+                ],
+                "primaria_alta": [
+                    { id: "P1", text: "¿El maestro promueve el respeto y el buen trato entre todos?" },
+                    { id: "P2", text: "¿El maestro hace que sus clases sean interesantes y dinámicas?" },
+                    { id: "P3", text: "¿Cuándo tienes dudas, el maestro te explica de forma clara?" },
+                    { id: "P4", text: "¿El maestro califica tus trabajos a tiempo y te dice cómo mejorar?" }
+                ],
+                "secundaria": [
+                    { id: "P1", text: "Establece reglas claras, promueve un ambiente de respeto mutuo y fomenta la disciplina positiva." },
+                    { id: "P2", text: "Muestra dominio y seguridad en el manejo de los temas de su materia." },
+                    { id: "P3", text: "Utiliza materiales y dinámicas variadas para mantener la atención e interés del grupo." },
+                    { id: "P4", text: "Fomenta la participación activa de los alumnos y la colaboración en clase." },
+                    { id: "P5", text: "Explica con claridad, responde dudas pacientemente y ofrece ejemplos prácticos." },
+                    { id: "P6", text: "Evalúa con criterios claros y objetivos, proporcionando retroalimentación útil." },
+                    { id: "P7", text: "Aprovecha eficientemente el tiempo de la clase para cubrir los contenidos planeados." },
+                    { id: "P8", text: "Muestra empatía, apertura al diálogo y brinda apoyo académico cuando se requiere." },
+                    { id: "P9", text: "Promueve valores, hábitos de estudio y el desarrollo integral de los alumnos." }
+                ],
+                "bachillerato": [
+                    { id: "P1", text: "Establece reglas claras, promueve un ambiente de respeto mutuo y fomenta la disciplina positiva." },
+                    { id: "P2", text: "Muestra dominio y seguridad en el manejo de los temas de su materia." },
+                    { id: "P3", text: "Utiliza materiales y dinámicas variadas para mantener la atención e interés del grupo." },
+                    { id: "P4", text: "Fomenta la participación activa de los alumnos y la colaboración en clase." },
+                    { id: "P5", text: "Explica con claridad, responde dudas pacientemente y ofrece ejemplos prácticos." },
+                    { id: "P6", text: "Evalúa con criterios claros y objetivos, proporcionando retroalimentación útil." },
+                    { id: "P7", text: "Aprovecha eficientemente el tiempo de la clase para cubrir los contenidos planeados." },
+                    { id: "P8", text: "Muestra empatía, apertura al diálogo y brinda apoyo académico cuando se requiere." },
+                    { id: "P9", text: "Promueve valores, hábitos de estudio y el desarrollo integral de los alumnos." }
+                ],
+                "coordinadores": [
+                    { id: "P1", text: "Atiende y resuelve tus dudas o solicitudes académicas de manera amable y oportuna." },
+                    { id: "P2", text: "Promueve la sana convivencia, el respeto y la disciplina positiva en su sección." },
+                    { id: "P3", text: "Demuestra organización en la coordinación de proyectos, eventos e información." },
+                    { id: "P4", text: "Es un canal de comunicación efectivo entre los maestros, dirección y alumnos." }
+                ],
+                "directores": [
+                    { id: "P1", text: "Su liderazgo se percibe de forma constructiva e inspiradora en toda la institución." },
+                    { id: "P2", text: "Es accesible al diálogo, escucha sugerencias y muestra empatía ante las inquietudes." },
+                    { id: "P3", text: "Toma decisiones acertadas y justas para la mejora del ambiente escolar." },
+                    { id: "P4", text: "Fomenta el orgullo, los valores y el sentido de pertenencia en el Colegio." }
+                ]
+            }
+        };
+
+        // Estado Reactivo de la Aplicación
+        const app = {
+            currentScreen: 'welcome', // 'welcome' | 'login' | 'evaluation' | 'success' | 'admin'
+            user: null, // Datos del usuario autenticado
+            evaluacionesData: [], // Datos de evaluaciones leídas desde Sheets
+            colegasExcluidos: [], // Lista de colegas que el usuario decidió omitir
+            selectedEvaluadorId: null, // Para el explorador detallado de alumnos en el Admin
+            buzonFiltroAlumno: 'todos', // Filtro de alumno en el buzón inteligente
+            buzonSearchQuery: '', // Buscador en vivo del buzón inteligente
+
+            // Inicialización de la App
+            init: function () {
+                this.navigate('welcome');
+                this.loadFromCache();
+            },
+
+            // Navegación de Vistas
+            navigate: function (screen) {
+                this.currentScreen = screen;
+                this.render();
+            },
+
+            // Almacenamiento local de contingencia
+            loadFromCache: function () {
+                const cached = localStorage.getItem('cgb_evaluaciones_cache');
+                if (cached) {
+                    this.evaluacionesData = JSON.parse(cached);
+                } else {
+                    // Carga por defecto si no hay conexión para pruebas locales rápidas
+                    this.evaluacionesData = this.getMockData();
+                }
+            },
+
+            // Generador de datos simulados realistas para el Dashboard
+            getMockData: function () {
+                const mock = [];
+                const roles = ["secundaria", "bachillerato", "primaria_alta", "primaria_baja"];
+                const alumnos = [
+                    "ian.barrientos@cgb.edu.mx", "sofia.castro@cgb.edu.mx", "diego.sanchez@cgb.edu.mx",
+                    "mateo.gomez@cgb.edu.mx", "camila.lopez@cgb.edu.mx", "valeria.martinez@cgb.edu.mx"
+                ];
+
+                alumnos.forEach((correo, index) => {
+                    const rol = roles[index % roles.length];
+                    const grado = CGB_DATABASE.grados[rol][0];
+                    const grupo = CGB_DATABASE.grupos[rol][0];
+                    const docentes = CGB_DATABASE.docentes[rol];
+
+                    docentes.forEach((docente, dIdx) => {
+                        // Generar respuestas numéricas entre 3 y 5
+                        const p1 = Math.floor(Math.random() * 3) + 3;
+                        const p2 = Math.floor(Math.random() * 3) + 3;
+                        const p3 = Math.floor(Math.random() * 3) + 3;
+                        const p4 = rol !== 'primaria_baja' ? Math.floor(Math.random() * 3) + 3 : 0;
+                        const p5 = (rol === 'secundaria' || rol === 'bachillerato') ? Math.floor(Math.random() * 3) + 3 : 0;
+                        const p6 = (rol === 'secundaria' || rol === 'bachillerato') ? Math.floor(Math.random() * 3) + 3 : 0;
+                        const p7 = (rol === 'secundaria' || rol === 'bachillerato') ? Math.floor(Math.random() * 3) + 3 : 0;
+                        const p8 = (rol === 'secundaria' || rol === 'bachillerato') ? Math.floor(Math.random() * 3) + 3 : 0;
+                        const p9 = (rol === 'secundaria' || rol === 'bachillerato') ? Math.floor(Math.random() * 3) + 3 : 0;
+
+                        // Solo registrar preguntas abiertas en el primer maestro evaluado por alumno para simular el comportamiento real del sheets
+                        const pref_si = dIdx === 0 ? "Matemáticas, Ciencias" : "";
+                        const pref_no = dIdx === 0 ? "Ninguna, todas me gustan" : "";
+                        const comment = dIdx === 0 ? "Sus clases son excelentes y siempre nos ayuda mucho con las dudas." : "";
+
+                        mock.push({
+                            timestamp: new Date().toLocaleString(),
+                            rol: rol,
+                            identificador: correo,
+                            grado: grado,
+                            grupo: grupo,
+                            docente: docente,
+                            p1: p1, p2: p2, p3: p3, p4: p4, p5: p5, p6: p6, p7: p7, p8: p8, p9: p9,
+                            prefiero_si: pref_si,
+                            prefiero_no: pref_no,
+                            comentarios: comment
+                        });
+                    });
+                });
+                return mock;
+            },
+
+            // Lógica de Renderizado Reactivo
+            render: function () {
+                const container = document.getElementById('app-container');
+                container.innerHTML = '';
+
+                switch (this.currentScreen) {
+                    case 'welcome':
+                        container.appendChild(this.viewWelcome());
+                        break;
+                    case 'login':
+                        container.appendChild(this.viewLogin());
+                        break;
+                    case 'evaluation':
+                        container.appendChild(this.viewEvaluation());
+                        break;
+                    case 'success':
+                        container.appendChild(this.viewSuccess());
+                        break;
+                    case 'admin':
+                        container.appendChild(this.viewAdmin());
+                        // Inicializar gráficos tras inyectar la vista en el DOM
+                        setTimeout(() => this.initAdminCharts(), 100);
+                        break;
+                }
+            },
+
+            // -----------------------------------------------------------------
+            // VISTAS DE PANTALLAS (WELCOME, LOGIN, EVALUATION, SUCCESS, ADMIN)
+            // -----------------------------------------------------------------
+
+            // 1. Pantalla de Bienvenida (Rediseño Limpio y Corporativo)
+            viewWelcome: function () {
+                const div = document.createElement('div');
+                div.className = "flex-grow flex flex-col items-center justify-center py-10 max-w-2xl mx-auto w-full";
+                div.innerHTML = `
+                    <div class="glass w-full rounded-3xl p-8 md:p-12 shadow-2xl text-center flex flex-col items-center gap-8 border border-white/50 relative overflow-hidden">
+                        <!-- Decoración Superior -->
+                        <div class="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-primary via-secondary to-accent"></div>
+                        
+                        <!-- Logotipo e Identidad -->
+                        <div class="flex flex-col items-center gap-3">
+                            <div class="w-20 h-20 bg-gradient-to-tr from-primary to-secondary rounded-2xl flex items-center justify-center text-white text-3xl font-black shadow-lg shadow-blue-950/20 transform hover:rotate-6 transition-transform">
+                                CGB
+                            </div>
+                            <div class="mt-2">
+                                <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight leading-none">Evaluación Docente</h1>
+                                <p class="text-xs font-bold text-accent tracking-widest uppercase mt-2">Colegio Gran Bretaña</p>
+                            </div>
+                        </div>
+
+                        <!-- Texto Explicativo -->
+                        <div class="space-y-4 text-slate-600 max-w-md">
+                            <p class="text-sm leading-relaxed">
+                                Bienvenido al Portal Oficial de Evaluación Docente. Tu participación sincera nos ayuda a mantener y elevar la calidad educativa que te distingue.
+                            </p>
+                            <div class="flex items-center justify-center gap-2 text-xs font-semibold text-slate-400 bg-slate-50 py-2 px-4 rounded-full border border-slate-100">
+                                <i class="fas fa-shield-alt text-emerald-500"></i>
+                                <span>Evaluación Completamente Anónima y Confidencial</span>
+                            </div>
+                        </div>
+
+                        <!-- Botón de Inicio -->
+                        <button onclick="app.navigate('login')" class="group relative w-full bg-gradient-to-r from-primary to-secondary text-white py-4 px-8 rounded-2xl font-bold tracking-wide shadow-lg shadow-blue-950/20 hover:shadow-xl hover:shadow-blue-900/30 active:scale-[0.98] transition-all overflow-hidden flex items-center justify-center gap-3 text-lg">
+                            <span class="relative z-10">Comenzar Evaluación</span>
+                            <i class="fas fa-chevron-right text-sm group-hover:translate-x-1 transition-transform relative z-10"></i>
+                            <div class="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+                        </button>
+
+                        <div class="text-[10px] text-slate-400 mt-2">
+                            Versión 6.0.0 (Gold Release) &bull; Gestión Segura de Datos
+                        </div>
+                    </div>
+                `;
+                return div;
+            },
+
+            // 2. Pantalla de Acceso Inteligente y Flexible
+            viewLogin: function () {
+                const div = document.createElement('div');
+                div.className = "flex-grow flex flex-col items-center justify-center py-10 max-w-xl mx-auto w-full";
+                
+                // Generar los roles interactivos de acceso
+                let roleOptionsHTML = '';
+                Object.entries(CGB_DATABASE.roles).forEach(([key, role]) => {
+                    roleOptionsHTML += `
+                        <button onclick="app.selectRoleForLogin('${key}')" class="group flex items-start gap-4 p-4 rounded-2xl border border-slate-200/80 bg-white/50 hover:bg-white hover:border-blue-500 hover:shadow-md transition-all text-left">
+                            <div class="w-10 h-10 rounded-xl bg-slate-100 group-hover:bg-blue-50 flex items-center justify-center text-lg text-slate-700 group-hover:text-primary transition-colors">
+                                <i class="${this.getRoleIcon(key)}"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-slate-800 text-sm group-hover:text-primary transition-colors">${role.title}</h3>
+                                <p class="text-xs text-slate-400 mt-0.5">${role.subtitle}</p>
+                            </div>
+                        </button>
+                    `;
+                });
+
+                div.innerHTML = `
+                    <div class="glass w-full rounded-3xl p-6 md:p-10 shadow-2xl flex flex-col gap-6 border border-white/50 relative">
+                        <button onclick="app.navigate('welcome')" class="absolute top-6 left-6 text-slate-400 hover:text-slate-600 transition-colors flex items-center gap-1.5 text-xs font-semibold">
+                            <i class="fas fa-chevron-left text-[10px]"></i> Volver
+                        </button>
+
+                        <div class="text-center mt-6">
+                            <h2 class="text-2xl font-extrabold text-slate-900">¿Quién ingresa al Portal?</h2>
+                            <p class="text-xs text-slate-400 mt-1">Selecciona tu perfil para iniciar la sesión</p>
+                        </div>
+
+                        <!-- Grilla de Roles -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+                            ${roleOptionsHTML}
+                        </div>
+
+                        <!-- Sección Dinámica del Formulario (Inyectada al elegir Rol) -->
+                        <div id="login-form-container" class="hidden border-t border-slate-100 pt-6 mt-2">
+                            <!-- Inyectado por JS -->
+                        </div>
+                    </div>
+                `;
+                return div;
+            },
+
+            getRoleIcon: function (role) {
+                const icons = {
+                    "primaria_baja": "fas fa-child",
+                    "primaria_alta": "fas fa-paint-brush",
+                    "secundaria": "fas fa-rocket",
+                    "bachillerato": "fas fa-user-graduate",
+                    "coordinadores": "fas fa-chart-line",
+                    "directores": "fas fa-crown",
+                    "admin": "fas fa-key"
+                };
+                return icons[role] || "fas fa-user";
+            },
+
+            // Selección de Rol en Pantalla de Login
+            selectRoleForLogin: function (role) {
+                const container = document.getElementById('login-form-container');
+                container.classList.remove('hidden');
+
+                let html = '';
+                const title = CGB_DATABASE.roles[role].title;
+
+                // Caso 1: Administrador o Evaluador Institucional (Acceso con contraseña)
+                if (role === 'admin' || role === 'coordinadores' || role === 'directores') {
+                    html = `
+                        <div class="flex flex-col gap-4 animate-fadeIn">
+                            <div class="bg-blue-50/50 border border-blue-100 rounded-xl p-3 flex gap-2.5 items-start">
+                                <i class="fas fa-info-circle text-blue-500 mt-0.5 text-xs"></i>
+                                <div class="text-xs text-blue-800 leading-normal">
+                                    <strong>Acceso Especial de ${title}:</strong> Ingrese su clave de seguridad para desbloquear la sesión. El correo es opcional.
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Correo Institucional (Opcional)</label>
+                                    <input type="email" id="login-email" placeholder="ejemplo@cgb.edu.mx" class="w-full bg-white border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Contraseña de Acceso</label>
+                                    <input type="password" id="login-password" placeholder="••••••••" class="w-full bg-white border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                                </div>
+                            </div>
+                            <button onclick="app.submitLogin('${role}')" class="w-full bg-primary text-white py-3.5 px-6 rounded-xl font-bold text-sm hover:bg-blue-800 shadow-md transition-all active:scale-[0.99] mt-2">
+                                Acceder al Portal
+                            </button>
+                        </div>
+                    `;
+                }
+                // Caso 2: Alumnos de Primaria Alta, Secundaria o Bachillerato (Solo Correo)
+                else if (role === 'primaria_alta' || role === 'secundaria' || role === 'bachillerato') {
+                    html = `
+                        <div class="flex flex-col gap-4 animate-fadeIn">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Correo Institucional del Alumno</label>
+                                <div class="relative">
+                                    <input type="email" id="login-email" placeholder="alumno@cgb.edu.mx" class="w-full bg-white border border-slate-200 rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                                    <i class="fas fa-envelope absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Grado</label>
+                                    <select id="login-grado" class="w-full bg-white border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all">
+                                        ${CGB_DATABASE.grados[role].map(g => `<option value="${g}">${g}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Grupo</label>
+                                    <select id="login-grupo" class="w-full bg-white border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all">
+                                        ${CGB_DATABASE.grupos[role].map(g => `<option value="${g}">${g}</option>`).join('')}
+                                    </select>
+                                </div>
+                            </div>
+                            <button onclick="app.submitLogin('${role}')" class="w-full bg-primary text-white py-3.5 px-6 rounded-xl font-bold text-sm hover:bg-blue-800 shadow-md transition-all active:scale-[0.99] mt-2">
+                                Ingresar a Evaluar
+                            </button>
+                        </div>
+                    `;
+                }
+                // Caso 3: Primaria Baja (Amigable, Campo Nombre Completo y Selectores de Grado)
+                else if (role === 'primaria_baja') {
+                    html = `
+                        <div class="flex flex-col gap-4 animate-fadeIn">
+                            <div class="bg-amber-50 border border-amber-100 rounded-xl p-3 flex gap-2.5 items-start">
+                                <i class="fas fa-smile text-amber-500 mt-0.5 text-xs"></i>
+                                <div class="text-xs text-amber-800 leading-normal">
+                                    <strong>¡Hola Pequeño!</strong> Escribe tu Nombre y elige tu Grado y Grupo para que puedas comenzar a evaluar a tus maestros favoritos.
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Escribe tu Nombre y Apellidos</label>
+                                <div class="relative">
+                                    <input type="text" id="login-name" placeholder="Ej. Carlos Mendoza" class="w-full bg-white border border-slate-200 rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                                    <i class="fas fa-user absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Mi Grado</label>
+                                    <select id="login-grado" class="w-full bg-white border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all">
+                                        ${CGB_DATABASE.grados[role].map(g => `<option value="${g}">${g}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Mi Grupo</label>
+                                    <select id="login-grupo" class="w-full bg-white border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all">
+                                        ${CGB_DATABASE.grupos[role].map(g => `<option value="${g}">${g}</option>`).join('')}
+                                    </select>
+                                </div>
+                            </div>
+                            <button onclick="app.submitLogin('${role}')" class="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white py-3.5 px-6 rounded-xl font-bold text-sm hover:from-amber-600 hover:to-orange-600 shadow-md transition-all active:scale-[0.99] mt-2">
+                                🎈 ¡Empezar Ahora!
+                            </button>
+                        </div>
+                    `;
+                }
+
+                container.innerHTML = html;
+                container.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            },
+
+            // Envío y Validación del Login (Integridad Máxima)
+            submitLogin: function (role) {
+                let email = '';
+                let grado = '';
+                let grupo = '';
+                let name = '';
+
+                if (role === 'admin' || role === 'coordinadores' || role === 'directores') {
+                    const rawPass = document.getElementById('login-password').value;
+                    const passwordNormalized = rawPass.trim().toLowerCase().replace(/\s+/g, '');
+                    const emailInput = document.getElementById('login-email').value.trim();
+
+                    // Comprobación de claves maestras
+                    if (passwordNormalized === 'arturo2026' || passwordNormalized === 'admin2026' || passwordNormalized === 'dir2026') {
+                        email = emailInput || `${role}@cgb.edu.mx`;
+                        grado = CGB_DATABASE.grados[role] ? CGB_DATABASE.grados[role][0] : 'Admin';
+                        grupo = 'Único';
+                        
+                        this.user = { role, email, grado, grupo, name: role.toUpperCase() };
+                        showToast(`¡Sesión iniciada como ${CGB_DATABASE.roles[role].title}!`, 'success');
+                        
+                        if (role === 'admin') {
+                            this.navigate('admin');
+                        } else {
+                            this.navigate('evaluation');
+                        }
+                    } else {
+                        showToast('Contraseña de acceso incorrecta.', 'error');
+                    }
+                    return;
+                }
+
+                if (role === 'primaria_baja') {
+                    name = document.getElementById('login-name').value.trim();
+                    grado = document.getElementById('login-grado').value;
+                    grupo = document.getElementById('login-grupo').value;
+
+                    if (!name) {
+                        showToast('Por favor escribe tu nombre.', 'error');
+                        return;
+                    }
+                    email = `${name.toLowerCase().replace(/\s+/g, '.')}@cgb.edu.mx`;
+                    this.user = { role, email, grado, grupo, name };
+                } else {
+                    email = document.getElementById('login-email').value.trim();
+                    grado = document.getElementById('login-grado').value;
+                    grupo = document.getElementById('login-grupo').value;
+
+                    if (!email) {
+                        showToast('Por favor introduce tu correo institucional.', 'error');
+                        return;
+                    }
+                    if (!email.endsWith('@cgb.edu.mx')) {
+                        showToast('El correo debe terminar en @cgb.edu.mx', 'error');
+                        return;
+                    }
+                    this.user = { role, email, grado, grupo, name: email.split('@')[0] };
+                }
+
+                showToast('¡Ingreso exitoso! Iniciando panel de evaluación.', 'success');
+                this.navigate('evaluation');
+            },
+
+            // 3. Pantalla de Evaluación (Dashboard de Estudiante - Pestañas en Vivo)
+            viewEvaluation: function () {
+                const div = document.createElement('div');
+                div.className = "flex-grow flex flex-col gap-6 w-full";
+
+                // Preparación de estado de docentes evaluados
+                const docentes = CGB_DATABASE.docentes[this.user.role];
+                if (!this.user.evaluacionesDocentes) {
+                    this.user.evaluacionesDocentes = {};
+                    docentes.forEach(d => {
+                        this.user.evaluacionesDocentes[d] = {
+                            evaluado: false,
+                            respuestas: {}
+                        };
+                    });
+                }
+
+                // Generar Pestañas de Profesores con su Estado
+                let tabsHTML = '';
+                docentes.forEach((docente) => {
+                    const isExcluded = this.colegasExcluidos.includes(docente);
+                    const state = this.user.evaluacionesDocentes[docente].evaluado;
+                    
+                    let bgClass = "bg-white border-slate-200 hover:border-slate-300 hover:shadow-md";
+                    let badgeHTML = '<span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold"><i class="fas fa-clock"></i> Pendiente</span>';
+
+                    if (isExcluded) {
+                        bgClass = "bg-slate-100 border-slate-200 opacity-60";
+                        badgeHTML = '<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 font-bold"><i class="fas fa-ban"></i> Excluido</span>';
+                    } else if (state) {
+                        bgClass = "bg-emerald-50/80 border-emerald-300 shadow-sm shadow-emerald-100";
+                        badgeHTML = '<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold"><i class="fas fa-check-circle"></i> Evaluado</span>';
+                    }
+
+                    if (this.user.activeDocente === docente) {
+                        bgClass = "bg-blue-50/50 border-primary ring-2 ring-primary/10 shadow-lg";
+                    }
+
+                    tabsHTML += `
+                        <button onclick="app.setActiveDocente('${docente}')" class="group flex flex-col items-start gap-2.5 p-4 rounded-2xl border-2 transition-all text-left ${bgClass}">
+                            <div class="flex items-center gap-2.5 w-full">
+                                <div class="w-8 h-8 rounded-lg bg-slate-100 group-hover:bg-blue-100 flex items-center justify-center text-slate-500 group-hover:text-primary transition-colors text-xs font-bold uppercase">
+                                    ${docente.substring(0, 2)}
+                                </div>
+                                <span class="font-extrabold text-slate-800 text-sm truncate flex-grow">${docente}</span>
+                            </div>
+                            <div class="flex items-center justify-between w-full mt-1">
+                                ${badgeHTML}
+                            </div>
+                        </button>
+                    `;
+                });
+
+                // Si no hay ningún docente activo seleccionado por defecto
+                if (!this.user.activeDocente) {
+                    this.user.activeDocente = docentes[0];
+                }
+
+                const activeDocente = this.user.activeDocente;
+                const isDocenteExcluded = this.colegasExcluidos.includes(activeDocente);
+                const isEvaluated = this.user.evaluacionesDocentes[activeDocente].evaluado;
+
+                // Render de Cuestionario para el Docente Activo
+                let cuestionarioHTML = '';
+                if (isDocenteExcluded) {
+                    cuestionarioHTML = `
+                        <div class="flex flex-col items-center justify-center text-center p-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                            <div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 text-2xl mb-4">
+                                <i class="fas fa-eye-slash"></i>
+                            </div>
+                            <h3 class="font-extrabold text-slate-800 text-base">Docente Excluido Temporalmente</h3>
+                            <p class="text-xs text-slate-400 max-w-sm mt-1.5">Has decidido omitir la evaluación de este docente mediante el módulo de Saneamiento Académico.</p>
+                            <button onclick="app.toggleExclusion('${activeDocente}')" class="mt-4 px-4 py-2 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-all hover:shadow-sm">
+                                <i class="fas fa-undo mr-1.5"></i> Reincorporar Docente
+                            </button>
+                        </div>
+                    `;
+                } else if (isEvaluated) {
+                    cuestionarioHTML = `
+                        <div class="flex flex-col items-center justify-center text-center p-12 bg-emerald-50/30 rounded-2xl border border-dashed border-emerald-200">
+                            <div class="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-2xl mb-4">
+                                <i class="fas fa-check-circle animate-pulse"></i>
+                            </div>
+                            <h3 class="font-extrabold text-slate-800 text-base">¡Evaluación de ${activeDocente} Registrada!</h3>
+                            <p class="text-xs text-slate-400 max-w-sm mt-1.5">Las respuestas para este docente han sido validadas en caliente. Puedes continuar con tus demás profesores en la grilla izquierda.</p>
+                        </div>
+                    `;
+                } else {
+                    cuestionarioHTML = this.renderFormularioPara(activeDocente);
+                }
+
+                div.innerHTML = `
+                    <!-- Encabezado de Sesión -->
+                    <div class="glass rounded-3xl p-6 shadow-xl border border-white/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative overflow-hidden">
+                        <div class="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-primary to-secondary"></div>
+                        <div class="flex items-center gap-3.5">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-primary to-secondary flex items-center justify-center text-white text-lg font-black shadow-lg">
+                                CGB
+                            </div>
+                            <div>
+                                <h2 class="text-lg font-extrabold text-slate-900 leading-none">${this.user.name}</h2>
+                                <p class="text-xs text-slate-400 mt-1">${CGB_DATABASE.roles[this.user.role].title} &bull; Grado: ${this.user.grado} &bull; Grupo: ${this.user.grupo}</p>
+                            </div>
+                        </div>
+                        <button onclick="app.logout()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-800 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 self-stretch md:self-auto justify-center">
+                            <i class="fas fa-sign-out-alt"></i> Salir de la Sesión
+                        </button>
+                    </div>
+
+                    <!-- Layout Principal de Evaluación -->
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                        <!-- Columna Izquierda: Grilla de Selección de Profesores -->
+                        <div class="lg:col-span-4 flex flex-col gap-4">
+                            <div class="glass rounded-3xl p-5 shadow-xl border border-white/50 flex flex-col gap-4">
+                                <div>
+                                    <h3 class="text-sm font-extrabold text-slate-800 tracking-tight">Mis Profesores a Evaluar</h3>
+                                    <p class="text-[11px] text-slate-400 mt-0.5">Selecciona el docente en la lista para evaluarlo en el orden que desees.</p>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2.5 max-h-[480px] overflow-y-auto pr-1">
+                                    ${tabsHTML}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Columna Derecha: Contenedor Dinámico del Formulario -->
+                        <div class="lg:col-span-8">
+                            <div class="glass rounded-3xl p-6 md:p-8 shadow-xl border border-white/50 flex flex-col gap-6 relative">
+                                <div class="flex justify-between items-center border-b border-slate-100 pb-4">
+                                    <div>
+                                        <span class="text-[10px] font-bold text-primary uppercase tracking-widest bg-blue-50 px-2.5 py-1 rounded-full border border-blue-100">Evaluando Actualmente</span>
+                                        <h2 class="text-xl font-black text-slate-900 mt-1.5">${activeDocente}</h2>
+                                    </div>
+                                    
+                                    <!-- Switch de Omitir Docente (Saneamiento Académico) -->
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-[11px] font-semibold text-slate-400">Omitir Docente</span>
+                                        <button onclick="app.toggleExclusion('${activeDocente}')" class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${isDocenteExcluded ? 'bg-accent' : 'bg-slate-200'}">
+                                            <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${isDocenteExcluded ? 'translate-x-4.5' : 'translate-x-1'}"></span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div id="cuestionario-interactive-area">
+                                    ${cuestionarioHTML}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                return div;
+            },
+
+            // Activación de un Docente en las Pestañas
+            setActiveDocente: function (docente) {
+                this.user.activeDocente = docente;
+                this.render();
+            },
+
+            // Toggle de Saneamiento Académico (Omitir / Excluir Colega de la lista)
+            toggleExclusion: function (docente) {
+                if (this.colegasExcluidos.includes(docente)) {
+                    this.colegasExcluidos = this.colegasExcluidos.filter(d => d !== docente);
+                    showToast(`Docente ${docente} reincorporado a la lista de evaluación.`, 'info');
+                } else {
+                    this.colegasExcluidos.push(docente);
+                    showToast(`Se ha omitido la evaluación de ${docente}.`, 'warning');
+                }
+                this.render();
+            },
+
+            // Render de Formulario Detallado por Docente Activo
+            renderFormularioPara: function (docente) {
+                const preguntas = CGB_DATABASE.preguntas[this.user.role];
+                let preguntasHTML = '';
+
+                preguntas.forEach((pregunta, index) => {
+                    // Cuestionario de Primaria Baja y Alta (Emojis visuales y amigables)
+                    if (this.user.role === 'primaria_baja' || this.user.role === 'primaria_alta') {
+                        preguntasHTML += `
+                            <div class="p-5 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                <div class="max-w-md">
+                                    <span class="text-xs font-extrabold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">Pregunta ${index + 1}</span>
+                                    <h4 class="font-bold text-slate-800 text-sm mt-1.5 leading-snug">${pregunta.text}</h4>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <button onclick="app.setRespuesta('${docente}', '${pregunta.id}', 5)" id="btn-${pregunta.id}-5" class="w-12 h-12 rounded-xl bg-white border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 flex flex-col items-center justify-center transition-all text-xl" title="Siempre">
+                                        😊
+                                        <span class="text-[8px] font-bold text-slate-400 mt-0.5">Siempre</span>
+                                    </button>
+                                    <button onclick="app.setRespuesta('${docente}', '${pregunta.id}', 3)" id="btn-${pregunta.id}-3" class="w-12 h-12 rounded-xl bg-white border border-slate-200 hover:border-amber-300 hover:bg-amber-50 flex flex-col items-center justify-center transition-all text-xl" title="A veces">
+                                        😐
+                                        <span class="text-[8px] font-bold text-slate-400 mt-0.5">A veces</span>
+                                    </button>
+                                    <button onclick="app.setRespuesta('${docente}', '${pregunta.id}', 1)" id="btn-${pregunta.id}-1" class="w-12 h-12 rounded-xl bg-white border border-slate-200 hover:border-rose-300 hover:bg-rose-50 flex flex-col items-center justify-center transition-all text-xl" title="Nunca">
+                                        🙁
+                                        <span class="text-[8px] font-bold text-slate-400 mt-0.5">Nunca</span>
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    } 
+                    // Secundaria, Bachillerato, Coordinadores, Directores (Rombos / Diamonds con efecto resplandeciente)
+                    else {
+                        preguntasHTML += `
+                            <div class="p-5 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+                                <div class="max-w-lg">
+                                    <span class="text-xs font-extrabold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">Pregunta ${index + 1}</span>
+                                    <h4 class="font-bold text-slate-800 text-sm mt-1.5 leading-snug">${pregunta.text}</h4>
+                                </div>
+                                <div class="flex items-center gap-4 py-2">
+                                    <div class="flex items-center gap-5">
+                                        ${[1, 2, 3, 4, 5].map(val => `
+                                            <div class="flex flex-col items-center gap-1.5">
+                                                <button onclick="app.setRespuesta('${docente}', '${pregunta.id}', ${val})" id="btn-${pregunta.id}-${val}" class="w-8 h-8 rounded bg-white border border-slate-200 flex items-center justify-center text-xs font-extrabold text-slate-600 rotate-45 diamond-pulse diamond-btn-${pregunta.id}">
+                                                    <span class="-rotate-45">${val}</span>
+                                                </button>
+                                                <span class="text-[8px] font-bold text-slate-400 uppercase mt-1 tracking-wider">
+                                                    ${val === 1 ? 'Nunca' : val === 3 ? 'Regular' : val === 5 ? 'Excelente' : ''}
+                                                </span>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                });
+
+                // Sección para las preguntas abiertas finales (solo si el alumno no ha llenado respuestas generales)
+                let openQuestionsHTML = '';
+                const isFirstEvaluation = Object.values(this.user.evaluacionesDocentes).filter(e => e.evaluado).length === 0;
+
+                if (isFirstEvaluation && this.user.role !== 'primaria_baja' && this.user.role !== 'coordinadores' && this.user.role !== 'directores') {
+                    openQuestionsHTML = `
+                        <div class="border-t border-slate-100 pt-6 mt-6 space-y-4">
+                            <h3 class="text-sm font-extrabold text-slate-800 tracking-tight">Preguntas de Selección y Opinión de la Encuesta</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">¿Qué clases o actividades prefieres o aprendes más?</label>
+                                    <textarea id="open-prefer-si" placeholder="Menciona asignaturas, proyectos o actividades..." class="w-full bg-white border border-slate-200 rounded-xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all h-24 resize-none"></textarea>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">¿Qué clases o aspectos crees que se pueden mejorar?</label>
+                                    <textarea id="open-prefer-no" placeholder="Dinos qué te gustaría que fuera más dinámico o diferente..." class="w-full bg-white border border-slate-200 rounded-xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all h-24 resize-none"></textarea>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Buzón de Sugerencias y Comentarios Libres (Opcional)</label>
+                                <textarea id="open-comentarios" placeholder="Tus palabras son de gran valor para nosotros..." class="w-full bg-white border border-slate-200 rounded-xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all h-20 resize-none"></textarea>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                return `
+                    <div class="flex flex-col gap-5">
+                        <div class="space-y-4">
+                            ${preguntasHTML}
+                        </div>
+                        ${openQuestionsHTML}
+                        <button onclick="app.validarYGuardarEvaluacion('${docente}')" class="w-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white py-4 px-6 rounded-2xl font-bold tracking-wide shadow-lg shadow-emerald-950/10 hover:shadow-xl hover:shadow-emerald-900/20 hover:from-emerald-600 hover:to-teal-700 transition-all active:scale-[0.99] flex items-center justify-center gap-2 mt-4">
+                            <i class="fas fa-check"></i> Validar y Guardar Evaluación de ${docente}
+                        </button>
+                    </div>
+                `;
+            },
+
+            // Guardado de respuesta local
+            setRespuesta: function (docente, preguntaId, valor) {
+                // Almacenar en el objeto de usuario de la sesión
+                this.user.evaluacionesDocentes[docente].respuestas[preguntaId] = valor;
+
+                // Actualizar interfaz visual de botones seleccionados
+                if (this.user.role === 'primaria_baja' || this.user.role === 'primaria_alta') {
+                    // Remover clases activas de los tres botones de esa pregunta
+                    [1, 3, 5].forEach(val => {
+                        const btn = document.getElementById(`btn-${preguntaId}-${val}`);
+                        if (btn) btn.className = "w-12 h-12 rounded-xl bg-white border border-slate-200 hover:border-slate-300 flex flex-col items-center justify-center transition-all text-xl";
+                    });
+                    // Aplicar borde activo al seleccionado
+                    const borderColors = { 5: 'border-emerald-500 bg-emerald-50/80', 3: 'border-amber-500 bg-amber-50/80', 1: 'border-rose-500 bg-rose-50/80' };
+                    const activeBtn = document.getElementById(`btn-${preguntaId}-${valor}`);
+                    if (activeBtn) activeBtn.className = `w-12 h-12 rounded-xl border-2 ${borderColors[valor]} flex flex-col items-center justify-center transition-all text-xl transform scale-105`;
+                } else {
+                    // Para Secundaria y Bachillerato (Diamonds a 45 grados)
+                    const btns = document.querySelectorAll(`.diamond-btn-${preguntaId}`);
+                    btns.forEach(btn => btn.classList.remove('diamond-active'));
+                    const selectedBtn = document.getElementById(`btn-${preguntaId}-${valor}`);
+                    if (selectedBtn) selectedBtn.classList.add('diamond-active');
+                }
+            },
+
+            // Validación y envío de evaluación de un docente individual
+            validarYGuardarEvaluacion: async function (docente) {
+                const preguntas = CGB_DATABASE.preguntas[this.user.role];
+                const respuestas = this.user.evaluacionesDocentes[docente].respuestas;
+
+                // Comprobar que todas las preguntas escalares tengan respuesta
+                for (let p of preguntas) {
+                    if (respuestas[p.id] === undefined) {
+                        showToast(`Por favor responde la pregunta ${p.id.replace('P', '')} de ${docente}.`, 'error');
+                        return;
+                    }
+                }
+
+                // Extraer valores de campos abiertos si es la primera evaluación y están presentes
+                const prefSiEl = document.getElementById('open-prefer-si');
+                const prefNoEl = document.getElementById('open-prefer-no');
+                const commentsEl = document.getElementById('open-comentarios');
+
+                const preferSi = prefSiEl ? prefSiEl.value.trim() : "";
+                const preferNo = prefNoEl ? prefNoEl.value.trim() : "";
+                const comentarios = commentsEl ? commentsEl.value.trim() : "";
+
+                // Marcar como evaluado
+                this.user.evaluacionesDocentes[docente].evaluado = true;
+                
+                // Construir fila de datos de evaluación para enviar al Sheets
+                const payload = {
+                    rol: this.user.role,
+                    identificador: this.user.email,
+                    grado: this.user.grado,
+                    grupo: this.user.grupo,
+                    docente: docente,
+                    p1: respuestas.P1 || 0,
+                    p2: respuestas.P2 || 0,
+                    p3: respuestas.P3 || 0,
+                    p4: respuestas.P4 || 0,
+                    p5: respuestas.P5 || 0,
+                    p6: respuestas.P6 || 0,
+                    p7: respuestas.P7 || 0,
+                    p8: respuestas.P8 || 0,
+                    p9: respuestas.P9 || 0,
+                    prefiero_si: preferSi,
+                    prefiero_no: preferNo,
+                    comentarios: comentarios
+                };
+
+                // Añadir al registro local del cliente para simulación instantánea offline
+                payload.timestamp = new Date().toLocaleString();
+                this.evaluacionesData.push(payload);
+                localStorage.setItem('cgb_evaluaciones_cache', JSON.stringify(this.evaluacionesData));
+
+                // Sincronizar en caliente de forma asíncrona en segundo plano con Google Sheets
+                this.sincronizarConNube(payload);
+
+                showToast(`Evaluación de ${docente} registrada con éxito.`, 'success');
+
+                // Comprobar si ya se evaluó a todos los profesores
+                const docentesTotales = CGB_DATABASE.docentes[this.user.role];
+                const completados = docentesTotales.every(d => this.user.evaluacionesDocentes[d].evaluado || this.colegasExcluidos.includes(d));
+
+                if (completados) {
+                    this.navigate('success');
+                } else {
+                    // Seleccionar automáticamente el siguiente docente pendiente
+                    const siguientePendiente = docentesTotales.find(d => !this.user.evaluacionesDocentes[d].evaluado && !this.colegasExcluidos.includes(d));
+                    if (siguientePendiente) {
+                        this.user.activeDocente = siguientePendiente;
+                    }
+                    this.render();
+                }
+            },
+
+            // Enlace de Sincronización Web asíncrono
+            sincronizarConNube: async function (payload) {
+                if (!GOOGLE_SHEETS_API_URL) return;
+                try {
+                    const response = await fetch(GOOGLE_SHEETS_API_URL, {
+                        method: 'POST',
+                        mode: 'no-cors', // Evita conflictos CORS directos al usar Google App Scripts
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'insert', data: payload })
+                    });
+                } catch (err) {
+                    console.error("Fallo de sincronización asíncrona", err);
+                }
+            },
+
+            // 4. Pantalla de Éxito de Celebración (con Mascota Bretax para Primaria)
+            viewSuccess: function () {
+                const div = document.createElement('div');
+                div.className = "flex-grow flex flex-col items-center justify-center py-10 max-w-2xl mx-auto w-full relative";
+
+                // Crear fondo de confeti para primaria
+                const isPrimaria = this.user.role === 'primaria_baja' || this.user.role === 'primaria_alta';
+                if (isPrimaria) {
+                    for (let i = 0; i < 30; i++) {
+                        const conf = document.createElement('div');
+                        conf.className = 'confetti';
+                        conf.style.left = `${Math.random() * 100}vw`;
+                        conf.style.animationDelay = `${Math.random() * 3}s`;
+                        conf.style.background = ['#3b82f6', '#10b981', '#f59e0b', '#dc2626', '#8b5cf6'][Math.floor(Math.random() * 5)];
+                        div.appendChild(conf);
+                    }
+                }
+
+                let contentHTML = '';
+
+                if (isPrimaria) {
+                    // Pantalla de Éxito Lúdica de Bretax
+                    contentHTML = `
+                        <div class="glass w-full rounded-3xl p-8 md:p-12 shadow-2xl text-center flex flex-col items-center gap-6 border border-white/50 relative overflow-hidden z-10">
+                            <!-- Efecto Brillo Superior -->
+                            <div class="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-amber-400 via-emerald-400 to-blue-500"></div>
+
+                            <!-- Personaje Bretax Apuntando -->
+                            <div class="relative w-48 h-48 rounded-full bg-blue-50 border-4 border-white flex items-center justify-center shadow-lg overflow-hidden bretax-celebrate">
+                                <img src="BRETAX APUNTANDO.jpg" alt="Mascota Bretax" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/200x200/3b82f6/ffffff?text=Bretax'">
+                            </div>
+
+                            <div class="space-y-2">
+                                <h2 class="text-3xl font-black text-slate-900 tracking-tight">¡Muchas Gracias, ${this.user.name}! 🌟</h2>
+                                <p class="text-xs text-emerald-600 font-extrabold tracking-widest uppercase">¡Has completado toda tu encuesta escolar!</p>
+                            </div>
+
+                            <p class="text-sm text-slate-500 leading-relaxed max-w-md">
+                                Bretax y tus maestros están sumamente felices por escuchar tus opiniones. Tus respuestas nos guiarán para hacer que las clases sean todavía más divertidas e increíbles para ti. ¡Que tengas un excelente día de clases!
+                            </p>
+
+                            <button onclick="app.logout()" class="w-full bg-gradient-to-r from-primary to-secondary text-white py-3.5 px-6 rounded-2xl font-bold text-sm shadow-md transition-all active:scale-[0.99] hover:shadow-lg">
+                                Volver al Inicio
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    // Pantalla de Éxito de Negocios de Gama Alta
+                    contentHTML = `
+                        <div class="glass w-full rounded-3xl p-8 md:p-12 shadow-2xl text-center flex flex-col items-center gap-6 border border-white/50 relative overflow-hidden z-10">
+                            <div class="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-primary to-secondary"></div>
+                            
+                            <div class="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center text-3xl shadow-sm">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+
+                            <div class="space-y-2">
+                                <h2 class="text-2xl font-black text-slate-900">Encuesta Finalizada Exitosamente</h2>
+                                <p class="text-xs text-slate-400">Tus evaluaciones han sido validadas e inyectadas a la base de datos de auditoría</p>
+                            </div>
+
+                            <p class="text-xs text-slate-500 max-w-md leading-relaxed">
+                                Agradecemos tu valiosa contribución al proceso continuo de mejora escolar del Colegio Gran Bretaña. Tus respuestas han sido procesadas de forma anónima y encriptada.
+                            </p>
+
+                            <button onclick="app.logout()" class="w-full bg-primary text-white py-3.5 px-6 rounded-2xl font-bold text-sm shadow-md transition-all active:scale-[0.99] hover:bg-blue-800">
+                                Volver al Portal de Inicio
+                            </button>
+                        </div>
+                    `;
+                }
+
+                div.innerHTML = contentHTML;
+                return div;
+            },
+
+            // Cierre de Sesión Seguro
+            logout: function () {
+                this.user = null;
+                this.colegasExcluidos = [];
+                this.selectedEvaluadorId = null;
+                this.buzonFiltroAlumno = 'todos';
+                this.buzonSearchQuery = '';
+                this.navigate('welcome');
+            },
+
+            // -----------------------------------------------------------------
+            // 5. VISTA DE ADMINISTRADOR (CONSOLA DE INTELIGENCIA DE DATOS)
+            // -----------------------------------------------------------------
+            viewAdmin: function () {
+                const div = document.createElement('div');
+                div.className = "flex-grow flex flex-col gap-6 w-full";
+
+                // Cálculo en Caliente de KPIs
+                const totalEvaluacionesRealizadas = this.evaluacionesData.length;
+                const evaluadoresUnicos = [...new Set(this.evaluacionesData.map(e => e.identificador))].length;
+
+                // Promedio Escolar Global
+                let sumaEscalar = 0;
+                let conteoEscalar = 0;
+                this.evaluacionesData.forEach(e => {
+                    [1, 2, 3, 4, 5, 6, 7, 8, 9].forEach(i => {
+                        const val = e[`p${i}`];
+                        if (val && val > 0) {
+                            sumaEscalar += val;
+                            conteoEscalar++;
+                        }
+                    });
+                });
+                const promedioGlobal = conteoEscalar > 0 ? (sumaEscalar / conteoEscalar).toFixed(2) : "0.00";
+
+                // Preparación de Lista de Alumnos en Registro de Participación
+                let participacionHTML = '';
+                const participantesMapa = {};
+
+                this.evaluacionesData.forEach(e => {
+                    if (!participantesMapa[e.identificador]) {
+                        participantesMapa[e.identificador] = {
+                            identificador: e.identificador,
+                            rol: e.rol,
+                            grado: e.grado,
+                            grupo: e.grupo,
+                            cantidad: 0
+                        };
+                    }
+                    participantesMapa[e.identificador].cantidad++;
+                });
+
+                Object.values(participantesMapa).forEach(p => {
+                    const isSelected = this.selectedEvaluadorId === p.identificador;
+                    participacionHTML += `
+                        <tr onclick="app.selectEvaluador('${p.identificador}')" class="cursor-pointer hover:bg-slate-50 transition-colors ${isSelected ? 'bg-blue-50/70 font-semibold' : ''}">
+                            <td class="px-5 py-3.5 text-xs text-slate-800">${p.identificador}</td>
+                            <td class="px-5 py-3.5 text-xs text-slate-500 uppercase">${p.rol.replace('_', ' ')}</td>
+                            <td class="px-5 py-3.5 text-xs text-slate-500">${p.grado} - ${p.grupo}</td>
+                            <td class="px-5 py-3.5 text-xs text-right">
+                                <span class="px-2 py-1 rounded-md bg-blue-50 text-blue-700 font-bold border border-blue-100">${p.cantidad}</span>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                if (participacionHTML === '') {
+                    participacionHTML = `<tr><td colspan="4" class="px-5 py-8 text-center text-xs text-slate-400">Sin registros en la base de datos local</td></tr>`;
+                }
+
+                // Selector de Alumnos en el Buzón de Sugerencias Inteligente
+                let optionAlumnosBuzonHTML = `<option value="todos">Todos los Alumnos</option>`;
+                Object.keys(participantesMapa).forEach(correo => {
+                    optionAlumnosBuzonHTML += `<option value="${correo}" ${this.buzonFiltroAlumno === correo ? 'selected' : ''}>${correo}</option>`;
+                });
+
+                // Render del Contenedor de Expediente de Alumno Detallado
+                let expedienteDetalladoHTML = '';
+                if (this.selectedEvaluadorId) {
+                    expedienteDetalladoHTML = this.renderExpedientePara(this.selectedEvaluadorId);
+                } else {
+                    expedienteDetalladoHTML = `
+                        <div class="flex flex-col items-center justify-center text-center p-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                            <div class="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center text-lg mb-3">
+                                <i class="fas fa-search"></i>
+                            </div>
+                            <h4 class="font-extrabold text-slate-800 text-xs">Sin Alumno Seleccionado</h4>
+                            <p class="text-[10px] text-slate-400 max-w-[240px] mt-1 leading-normal">Haz clic en cualquier renglón de la tabla superior para desplegar sus evaluaciones individuales de forma completa.</p>
+                        </div>
+                    `;
+                }
+
+                // Render de Buzón de Sugerencias Inteligente y Sentiment Tagging
+                let buzonOpinionesHTML = '';
+                const opinionesFiltradas = this.evaluacionesData.filter(e => {
+                    // Validar si tiene comentario o alguna preferencia abierta
+                    const tieneComentario = e.comentarios && e.comentarios.trim() !== "";
+                    const tienePreferSi = e.prefiero_si && e.prefiero_si.trim() !== "";
+                    const tienePreferNo = e.prefiero_no && e.prefiero_no.trim() !== "";
+                    
+                    if (!tieneComentario && !tienePreferSi && !tienePreferNo) return false;
+
+                    // Filtro por Alumno
+                    if (this.buzonFiltroAlumno !== 'todos' && e.identificador !== this.buzonFiltroAlumno) return false;
+
+                    // Buscador en Vivo por Palabras Clave
+                    if (this.buzonSearchQuery.trim() !== "") {
+                        const query = this.buzonSearchQuery.toLowerCase();
+                        const enComentario = e.comentarios ? e.comentarios.toLowerCase().includes(query) : false;
+                        const enSi = e.prefiero_si ? e.prefiero_si.toLowerCase().includes(query) : false;
+                        const enNo = e.prefiero_no ? e.prefiero_no.toLowerCase().includes(query) : false;
+                        const enDocente = e.docente ? e.docente.toLowerCase().includes(query) : false;
+                        const enAlumno = e.identificador ? e.identificador.toLowerCase().includes(query) : false;
+
+                        if (!enComentario && !enSi && !enNo && !enDocente && !enAlumno) return false;
+                    }
+
+                    return true;
+                });
+
+                opinionesFiltradas.forEach(op => {
+                    // Sentiment Tagging Automático Cruzado con Promedio Numérico del Registro
+                    let totalPuntos = 0;
+                    let numPreguntasValidas = 0;
+                    [1, 2, 3, 4, 5, 6, 7, 8, 9].forEach(i => {
+                        const v = op[`p${i}`];
+                        if (v && v > 0) {
+                            totalPuntos += v;
+                            numPreguntasValidas++;
+                        }
+                    });
+                    const promRegistro = numPreguntasValidas > 0 ? totalPuntos / numPreguntasValidas : 3;
+
+                    let sentimentTagHTML = '';
+                    if (promRegistro >= 4.2) {
+                        sentimentTagHTML = `<span class="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200"><i class="fas fa-heart text-[8px] mr-1"></i> Destacado / Trato Positivo</span>`;
+                    } else if (promRegistro >= 3.0) {
+                        sentimentTagHTML = `<span class="text-[9px] font-bold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200"><i class="fas fa-comment-dots text-[8px] mr-1"></i> Sugerencia de Trabajo</span>`;
+                    } else {
+                        sentimentTagHTML = `<span class="text-[9px] font-bold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200"><i class="fas fa-exclamation-triangle text-[8px] mr-1"></i> Alerta de Desempeño</span>`;
+                    }
+
+                    buzonOpinionesHTML += `
+                        <div class="p-5 rounded-2xl bg-white border border-slate-100 flex flex-col gap-3.5 hover:shadow-sm transition-all">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="flex flex-col">
+                                    <span class="text-xs font-black text-slate-800">${op.identificador}</span>
+                                    <span class="text-[9px] font-bold text-slate-400 mt-0.5 uppercase">${op.rol.replace('_', ' ')} &bull; ${op.grado}</span>
+                                </div>
+                                ${sentimentTagHTML}
+                            </div>
+                            
+                            <!-- Comentarios y Selección Estructurada -->
+                            <div class="space-y-3 pt-1">
+                                ${op.prefiero_si ? `
+                                    <div class="text-xs leading-normal">
+                                        <strong class="text-slate-600 block text-[10px] uppercase font-extrabold tracking-wider mb-0.5">Clases que más aprende:</strong>
+                                        <span class="text-slate-500">${op.prefiero_si}</span>
+                                    </div>
+                                ` : ''}
+                                ${op.prefiero_no ? `
+                                    <div class="text-xs leading-normal">
+                                        <strong class="text-slate-600 block text-[10px] uppercase font-extrabold tracking-wider mb-0.5">Clases por mejorar:</strong>
+                                        <span class="text-slate-500">${op.prefiero_no}</span>
+                                    </div>
+                                ` : ''}
+                                ${op.comentarios ? `
+                                    <div class="text-xs leading-normal">
+                                        <strong class="text-slate-600 block text-[10px] uppercase font-extrabold tracking-wider mb-0.5">Sugerencias Libres:</strong>
+                                        <p class="text-slate-600 italic bg-slate-50 p-2.5 rounded-xl border border-slate-100 mt-1">"${op.comentarios}"</p>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                if (buzonOpinionesHTML === '') {
+                    buzonOpinionesHTML = `
+                        <div class="p-8 text-center text-xs text-slate-400 bg-white border border-dashed border-slate-100 rounded-2xl">
+                            No se encontraron comentarios que coincidan con los filtros seleccionados
+                        </div>
+                    `;
+                }
+
+                div.innerHTML = `
+                    <!-- Encabezado de Inteligencia -->
+                    <div class="glass rounded-3xl p-6 shadow-xl border border-white/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative overflow-hidden">
+                        <div class="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-primary to-accent"></div>
+                        <div class="flex items-center gap-3.5">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-primary to-accent flex items-center justify-center text-white text-lg font-black shadow-lg">
+                                CGB
+                            </div>
+                            <div>
+                                <h2 class="text-lg font-extrabold text-slate-900 leading-none">Consola de Inteligencia Académica</h2>
+                                <p class="text-xs text-slate-400 mt-1">Monitoreo Ejecutivo de Calidad y Resultados Docentes</p>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                            <!-- Botón Configuración de API (Engrane Protegido) -->
+                            <button onclick="app.openConfigModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-800 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 justify-center" title="Configurar conexión del servidor de Sheets">
+                                <i class="fas fa-cog"></i> Configurar API
+                            </button>
+                            <button onclick="app.sincronizarCompletoDesdeNube()" class="px-4 py-2 bg-gradient-to-r from-primary to-secondary text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-1.5 justify-center">
+                                <i class="fas fa-sync-alt"></i> Sincronizar Nube
+                            </button>
+                            <button onclick="app.logout()" class="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 justify-center">
+                                <i class="fas fa-sign-out-alt"></i> Salir
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Métrica KPIs en Tarjetas -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                        <div class="glass rounded-3xl p-5 border border-white/50 shadow-md flex items-center gap-4 relative overflow-hidden">
+                            <div class="w-12 h-12 rounded-2xl bg-blue-50 text-primary flex items-center justify-center text-xl">
+                                <i class="fas fa-poll-h"></i>
+                            </div>
+                            <div>
+                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total de Evaluaciones</span>
+                                <h3 class="text-2xl font-black text-slate-800 mt-0.5">${totalEvaluacionesRealizadas}</h3>
+                            </div>
+                        </div>
+                        <div class="glass rounded-3xl p-5 border border-white/50 shadow-md flex items-center gap-4 relative overflow-hidden">
+                            <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div>
+                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Alumnos Participantes</span>
+                                <h3 class="text-2xl font-black text-slate-800 mt-0.5">${evaluadoresUnicos}</h3>
+                            </div>
+                        </div>
+                        <div class="glass rounded-3xl p-5 border border-white/50 shadow-md flex items-center gap-4 relative overflow-hidden">
+                            <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl">
+                                <i class="fas fa-star-half-alt"></i>
+                            </div>
+                            <div>
+                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Promedio Escolar Global</span>
+                                <h3 class="text-2xl font-black text-slate-800 mt-0.5">${promedioGlobal} / 5.00</h3>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Módulos de Análisis -->
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        <!-- Columna Izquierda: Gráfico de Comportamiento Docente -->
+                        <div class="lg:col-span-8 flex flex-col gap-6">
+                            <!-- Gráfico de Tendencias -->
+                            <div class="glass rounded-3xl p-6 border border-white/50 shadow-md">
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4 mb-4">
+                                    <div>
+                                        <h3 class="text-sm font-extrabold text-slate-800 tracking-tight">Comportamiento del Desempeño por Pregunta</h3>
+                                        <p class="text-[10px] text-slate-400">Puntajes promedio ponderados en estricto orden numérico (P1 a P9)</p>
+                                    </div>
+                                    <!-- Filtro de Rol para la Gráfica -->
+                                    <select id="admin-chart-filter-role" onchange="app.initAdminCharts()" class="bg-white border border-slate-200 rounded-xl py-1.5 px-3 text-xs focus:outline-none transition-all">
+                                        <option value="todos">Todos los Roles</option>
+                                        <option value="primaria_baja">Primaria Baja</option>
+                                        <option value="primaria_alta">Primaria Alta</option>
+                                        <option value="secundaria">Secundaria</option>
+                                        <option value="bachillerato">Bachillerato</option>
+                                        <option value="coordinadores">Coordinadores</option>
+                                        <option value="directores">Directores</option>
+                                    </select>
+                                </div>
+                                <div class="w-full h-80 relative flex items-center justify-center">
+                                    <canvas id="adminTrendChart"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Buzón de Sugerencias Inteligente Dual -->
+                            <div class="glass rounded-3xl p-6 border border-white/50 shadow-md flex flex-col gap-5">
+                                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-100 pb-4">
+                                    <div>
+                                        <h3 class="text-sm font-extrabold text-slate-800 tracking-tight">Buzón de Sugerencias y Comentarios Libres</h3>
+                                        <p class="text-[10px] text-slate-400">Opiniones cualitativas analizadas mediante Sentiment Tagging Cruzado</p>
+                                    </div>
+                                    
+                                    <!-- Controles del Buzón -->
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <button onclick="app.copiarReporteLimpio()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[11px] font-bold transition-all flex items-center gap-1">
+                                            <i class="fas fa-copy"></i> Copiar Reporte
+                                        </button>
+                                        
+                                        <!-- Buscador en Vivo del Buzón -->
+                                        <div class="relative">
+                                            <input type="text" id="buzon-live-search" oninput="app.updateBuzonSearch(this.value)" value="${this.buzonSearchQuery}" placeholder="Buscar palabra..." class="bg-white border border-slate-200 rounded-xl py-1.5 pl-8 pr-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 transition-all w-36">
+                                            <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]"></i>
+                                        </div>
+
+                                        <!-- Selector por Alumno -->
+                                        <select id="buzon-filter-alumno" onchange="app.updateBuzonFiltroAlumno(this.value)" class="bg-white border border-slate-200 rounded-xl py-1.5 px-3 text-xs focus:outline-none transition-all max-w-[160px]">
+                                            ${optionAlumnosBuzonHTML}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="flex flex-col gap-3.5 max-h-[460px] overflow-y-auto pr-1">
+                                    ${buzonOpinionesHTML}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Columna Derecha: Participación y Expediente Detallado -->
+                        <div class="lg:col-span-4 flex flex-col gap-6">
+                            <!-- Registro de Participación -->
+                            <div class="glass rounded-3xl p-5 border border-white/50 shadow-md flex flex-col gap-4">
+                                <div>
+                                    <h3 class="text-sm font-extrabold text-slate-800 tracking-tight">Registro de Participación</h3>
+                                    <p class="text-[10px] text-slate-400">Haga clic en un alumno para auditar su expediente completo</p>
+                                </div>
+                                <div class="overflow-x-auto max-h-[300px] overflow-y-auto border border-slate-100 rounded-xl">
+                                    <table class="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr class="bg-slate-50 border-b border-slate-100">
+                                                <th class="px-5 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Identificador</th>
+                                                <th class="px-5 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sección</th>
+                                                <th class="px-5 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">G - G</th>
+                                                <th class="px-5 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right">Cant.</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${participacionHTML}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Expediente del Alumno Seleccionado -->
+                            <div class="glass rounded-3xl p-5 border border-white/50 shadow-md flex flex-col gap-4">
+                                <div>
+                                    <h3 class="text-sm font-extrabold text-slate-800 tracking-tight">Expediente de Evaluaciones</h3>
+                                    <p class="text-[10px] text-slate-400">Detalle integral por alumno independiente de filtros externos</p>
+                                </div>
+                                <div id="expediente-detallado-container">
+                                    ${expedienteDetalladoHTML}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                return div;
+            },
+
+            // Selección de un alumno para ver su Expediente Individual
+            selectEvaluador: function (correo) {
+                this.selectedEvaluadorId = correo;
+                this.render();
+            },
+
+            // Actualización del filtro del buzón desde el selector
+            updateBuzonFiltroAlumno: function (val) {
+                this.buzonFiltroAlumno = val;
+                this.render();
+            },
+
+            // Actualización del buscador en vivo del buzón
+            updateBuzonSearch: function (val) {
+                this.buzonSearchQuery = val;
+                // Evitamos renderizar por completo para no perder el focus del input
+                const feedContainer = document.querySelector('.max-h-\\[460px\\]');
+                if (feedContainer) {
+                    // Re-renderizamos solamente la sección de opiniones
+                    let buzonOpinionesHTML = '';
+                    const participantesMapa = {};
+                    this.evaluacionesData.forEach(e => {
+                        if (!participantesMapa[e.identificador]) {
+                            participantesMapa[e.identificador] = true;
+                        }
+                    });
+
+                    const opinionesFiltradas = this.evaluacionesData.filter(e => {
+                        const tieneComentario = e.comentarios && e.comentarios.trim() !== "";
+                        const tienePreferSi = e.prefiero_si && e.prefiero_si.trim() !== "";
+                        const tienePreferNo = e.prefiero_no && e.prefiero_no.trim() !== "";
+                        
+                        if (!tieneComentario && !tienePreferSi && !tienePreferNo) return false;
+                        if (this.buzonFiltroAlumno !== 'todos' && e.identificador !== this.buzonFiltroAlumno) return false;
+
+                        if (this.buzonSearchQuery.trim() !== "") {
+                            const query = this.buzonSearchQuery.toLowerCase();
+                            const enComentario = e.comentarios ? e.comentarios.toLowerCase().includes(query) : false;
+                            const enSi = e.prefiero_si ? e.prefiero_si.toLowerCase().includes(query) : false;
+                            const enNo = e.prefiero_no ? e.prefiero_no.toLowerCase().includes(query) : false;
+                            const enDocente = e.docente ? e.docente.toLowerCase().includes(query) : false;
+                            const enAlumno = e.identificador ? e.identificador.toLowerCase().includes(query) : false;
+
+                            if (!enComentario && !enSi && !enNo && !enDocente && !enAlumno) return false;
+                        }
+                        return true;
+                    });
+
+                    opinionesFiltradas.forEach(op => {
+                        let totalPuntos = 0;
+                        let numPreguntasValidas = 0;
+                        [1, 2, 3, 4, 5, 6, 7, 8, 9].forEach(i => {
+                            const v = op[`p${i}`];
+                            if (v && v > 0) {
+                                totalPuntos += v;
+                                numPreguntasValidas++;
+                            }
+                        });
+                        const promRegistro = numPreguntasValidas > 0 ? totalPuntos / numPreguntasValidas : 3;
+
+                        let sentimentTagHTML = '';
+                        if (promRegistro >= 4.2) {
+                            sentimentTagHTML = `<span class="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200"><i class="fas fa-heart text-[8px] mr-1"></i> Destacado / Trato Positivo</span>`;
+                        } else if (promRegistro >= 3.0) {
+                            sentimentTagHTML = `<span class="text-[9px] font-bold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200"><i class="fas fa-comment-dots text-[8px] mr-1"></i> Sugerencia de Trabajo</span>`;
+                        } else {
+                            sentimentTagHTML = `<span class="text-[9px] font-bold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200"><i class="fas fa-exclamation-triangle text-[8px] mr-1"></i> Alerta de Desempeño</span>`;
+                        }
+
+                        buzonOpinionesHTML += `
+                            <div class="p-5 rounded-2xl bg-white border border-slate-100 flex flex-col gap-3.5 hover:shadow-sm transition-all">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="flex flex-col">
+                                        <span class="text-xs font-black text-slate-800">${op.identificador}</span>
+                                        <span class="text-[9px] font-bold text-slate-400 mt-0.5 uppercase">${op.rol.replace('_', ' ')} &bull; ${op.grado}</span>
+                                    </div>
+                                    ${sentimentTagHTML}
+                                </div>
+                                <div class="space-y-3 pt-1">
+                                    ${op.prefiero_si ? `<div class="text-xs leading-normal"><strong class="text-slate-600 block text-[10px] uppercase font-extrabold tracking-wider mb-0.5">Clases que más aprende:</strong><span class="text-slate-500">${op.prefiero_si}</span></div>` : ''}
+                                    ${op.prefiero_no ? `<div class="text-xs leading-normal"><strong class="text-slate-600 block text-[10px] uppercase font-extrabold tracking-wider mb-0.5">Clases por mejorar:</strong><span class="text-slate-500">${op.prefiero_no}</span></div>` : ''}
+                                    ${op.comentarios ? `<div class="text-xs leading-normal"><strong class="text-slate-600 block text-[10px] uppercase font-extrabold tracking-wider mb-0.5">Sugerencias Libres:</strong><p class="text-slate-600 italic bg-slate-50 p-2.5 rounded-xl border border-slate-100 mt-1">"${op.comentarios}"</p></div>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    if (buzonOpinionesHTML === '') {
+                        buzonOpinionesHTML = `<div class="p-8 text-center text-xs text-slate-400 bg-white border border-dashed border-slate-100 rounded-2xl">No se encontraron comentarios que coincidan</div>`;
+                    }
+                    feedContainer.innerHTML = buzonOpinionesHTML;
+                }
+            },
+
+            // Copiar Reporte Cualitativo Limpio al Portapapeles (Formato Ejecutivo)
+            copiarReporteLimpio: function () {
+                const query = this.buzonSearchQuery.toLowerCase();
+                const opiniones = this.evaluacionesData.filter(e => {
+                    const tieneComentario = e.comentarios && e.comentarios.trim() !== "";
+                    const tienePreferSi = e.prefiero_si && e.prefiero_si.trim() !== "";
+                    const tienePreferNo = e.prefiero_no && e.prefiero_no.trim() !== "";
+                    if (!tieneComentario && !tienePreferSi && !tienePreferNo) return false;
+                    if (this.buzonFiltroAlumno !== 'todos' && e.identificador !== this.buzonFiltroAlumno) return false;
+
+                    if (query !== "") {
+                        const enComentario = e.comentarios ? e.comentarios.toLowerCase().includes(query) : false;
+                        const enSi = e.prefiero_si ? e.prefiero_si.toLowerCase().includes(query) : false;
+                        const enNo = e.prefiero_no ? e.prefiero_no.toLowerCase().includes(query) : false;
+                        const enDocente = e.docente ? e.docente.toLowerCase().includes(query) : false;
+                        if (!enComentario && !enSi && !enNo && !enDocente) return false;
+                    }
+                    return true;
+                });
+
+                if (opiniones.length === 0) {
+                    showToast('No hay comentarios para exportar.', 'error');
+                    return;
+                }
+
+                let txt = `========================================================\n`;
+                txt += `    REPORTE CUALITATIVO DE EVALUACIÓN DOCENTE - CGB\n`;
+                txt += `    Fecha de Exportación: ${new Date().toLocaleDateString()}\n`;
+                txt += `========================================================\n\n`;
+
+                opiniones.forEach((op, index) => {
+                    txt += `${index + 1}. EVALUADOR: ${op.identificador} (${op.rol.toUpperCase()} - ${op.grado})\n`;
+                    if (op.prefiero_si) txt += `   [Clases Preferidas]: ${op.prefiero_si}\n`;
+                    if (op.prefiero_no) txt += `   [Clases por Mejorar]: ${op.prefiero_no}\n`;
+                    if (op.comentarios) txt += `   [Comentarios Libres]: "${op.comentarios}"\n`;
+                    txt += `--------------------------------------------------------\n`;
+                });
+
+                // Utilizar document.execCommand para el copiado compatible con iFrames
+                const dummy = document.createElement("textarea");
+                document.body.appendChild(dummy);
+                dummy.value = txt;
+                dummy.select();
+                document.execCommand("copy");
+                document.body.removeChild(dummy);
+
+                showToast('¡Reporte cualitativo copiado al portapapeles!', 'success');
+            },
+
+            // Render del Expediente de un Alumno Detallado
+            renderExpedientePara: function (correo) {
+                // Buscamos todas las evaluaciones de este alumno (Inmune a Filtros Cruzados de Docentes)
+                const evaluacionesAlumno = this.evaluacionesData.filter(e => e.identificador === correo);
+
+                if (evaluacionesAlumno.length === 0) {
+                    return `<p class="text-xs text-slate-400">No se encontraron evaluaciones registradas de este alumno.</p>`;
+                }
+
+                // Obtener metadatos básicos de la primera evaluación encontrada
+                const meta = evaluacionesAlumno[0];
+
+                // Generar lista detallada de docentes evaluados
+                let docentesEvaluadosHTML = '';
+                evaluacionesAlumno.forEach(eval => {
+                    // Calcular el promedio del docente evaluado
+                    let suma = 0;
+                    let num = 0;
+                    [1, 2, 3, 4, 5, 6, 7, 8, 9].forEach(i => {
+                        const val = eval[`p${i}`];
+                        if (val && val > 0) {
+                            suma += val;
+                            num++;
+                        }
+                    });
+                    const prom = num > 0 ? (suma / num).toFixed(1) : "N/A";
+                    
+                    let promBadgeColor = "bg-rose-50 text-rose-700 border-rose-200";
+                    if (suma / num >= 4.0) {
+                        promBadgeColor = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                    } else if (suma / num >= 3.0) {
+                        promBadgeColor = "bg-amber-50 text-amber-700 border-amber-200";
+                    }
+
+                    docentesEvaluadosHTML += `
+                        <div class="flex items-center justify-between p-3 rounded-xl bg-white border border-slate-100 hover:shadow-sm transition-all">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-6 h-6 rounded-md bg-slate-50 flex items-center justify-center text-[10px] font-extrabold text-slate-500 uppercase">
+                                    ${eval.docente.substring(0, 2)}
+                                </div>
+                                <span class="text-xs font-bold text-slate-800">${eval.docente}</span>
+                            </div>
+                            <span class="text-[10px] font-black px-2 py-0.5 rounded-full border ${promBadgeColor}">${prom} / 5.0</span>
+                        </div>
+                    `;
+                });
+
+                // Consolidar todas las preguntas abiertas encontradas de este alumno (recorriendo todas sus evaluaciones por si están en otra fila)
+                let preferSi = 'No especificado';
+                let preferNo = 'No especificado';
+                let comentarios = 'Sin comentarios registrados';
+
+                evaluacionesAlumno.forEach(eval => {
+                    if (eval.prefiero_si && eval.prefiero_si.trim() !== '') preferSi = eval.prefiero_si;
+                    if (eval.prefiero_no && eval.prefiero_no.trim() !== '') preferNo = eval.prefiero_no;
+                    if (eval.comentarios && eval.comentarios.trim() !== '') comentarios = eval.comentarios;
+                });
+
+                return `
+                    <div class="flex flex-col gap-4 animate-fadeIn">
+                        <div class="p-4 rounded-2xl bg-blue-50/50 border border-blue-100 flex flex-col gap-1.5">
+                            <span class="text-[9px] font-extrabold text-primary tracking-widest uppercase">Evaluador Auditado</span>
+                            <h4 class="font-black text-slate-800 text-sm truncate">${correo}</h4>
+                            <p class="text-[10px] text-slate-500 capitalize leading-normal">${meta.rol.replace('_', ' ')} &bull; ${meta.grado} &bull; Grupo: ${meta.grupo}</p>
+                        </div>
+
+                        <!-- Profesores Evaluados -->
+                        <div class="space-y-2">
+                            <h5 class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Historial de Calificaciones</h5>
+                            <div class="flex flex-col gap-1.5 max-h-[160px] overflow-y-auto pr-1">
+                                ${docentesEvaluadosHTML}
+                            </div>
+                        </div>
+
+                        <!-- Respuestas Abiertas del Expediente -->
+                        <div class="space-y-3 pt-2 border-t border-slate-100">
+                            <h5 class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Respuestas Abiertas Generales de la Encuesta</h5>
+                            <div class="space-y-2.5">
+                                <div class="text-[11px] leading-normal">
+                                    <strong class="text-slate-600 block font-extrabold">Clases o materias preferidas:</strong>
+                                    <span class="text-slate-500">${preferSi}</span>
+                                </div>
+                                <div class="text-[11px] leading-normal">
+                                    <strong class="text-slate-600 block font-extrabold">Clases o aspectos por mejorar:</strong>
+                                    <span class="text-slate-500">${preferNo}</span>
+                                </div>
+                                <div class="text-[11px] leading-normal">
+                                    <strong class="text-slate-600 block font-extrabold">Sugerencias o comentarios libres:</strong>
+                                    <p class="text-slate-600 italic bg-white p-2.5 rounded-xl border border-slate-100 mt-1">"${comentarios}"</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            // Inicialización de Gráficos de Admin (Chart.js con Ordenamiento Numérico Estricto)
+            initAdminCharts: function () {
+                const canvas = document.getElementById('adminTrendChart');
+                if (!canvas) return;
+
+                const roleFilter = document.getElementById('admin-chart-filter-role').value;
+                
+                // Mapear y agrupar promedios de P1 a P9 en estricto orden numérico
+                const sumasP = { P1: 0, P2: 0, P3: 0, P4: 0, P5: 0, P6: 0, P7: 0, P8: 0, P9: 0 };
+                const conteosP = { P1: 0, P2: 0, P3: 0, P4: 0, P5: 0, P6: 0, P7: 0, P8: 0, P9: 0 };
+
+                const datosFiltrados = roleFilter === 'todos' 
+                    ? this.evaluacionesData 
+                    : this.evaluacionesData.filter(e => e.rol === roleFilter);
+
+                datosFiltrados.forEach(eval => {
+                    [1, 2, 3, 4, 5, 6, 7, 8, 9].forEach(i => {
+                        const val = eval[`p${i}`];
+                        if (val && val > 0) {
+                            sumasP[`P${i}`] += val;
+                            conteosP[`P${i}`]++;
+                        }
+                    });
+                });
+
+                // Crear los arrays correspondientes para el gráfico
+                const labels = ["P1 (Establece Reglas)", "P2 (Dominio Temas)", "P3 (Didáctica)", "P4 (Participación)", "P5 (Claridad)", "P6 (Evaluación)", "P7 (Tiempo)", "P8 (Empatía)", "P9 (Valores)"];
+                const dataPoints = [];
+
+                [1, 2, 3, 4, 5, 6, 7, 8, 9].forEach(i => {
+                    const prom = conteosP[`P${i}`] > 0 ? (sumasP[`P${i}`] / conteosP[`P${i}`]) : 0;
+                    dataPoints.push(prom);
+                });
+
+                // Destruir instancia anterior para evitar colisiones
+                if (window.trendChartInstance) {
+                    window.trendChartInstance.destroy();
+                }
+
+                // Generar nueva Gráfica Lineal Premium
+                window.trendChartInstance = new Chart(canvas.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Puntaje Promedio',
+                            data: dataPoints,
+                            borderColor: '#1e40af',
+                            backgroundColor: 'rgba(59, 130, 246, 0.06)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.35,
+                            pointRadius: 5,
+                            pointHoverRadius: 7,
+                            pointBackgroundColor: '#ffffff',
+                            pointBorderColor: '#1e40af',
+                            pointBorderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                padding: 10,
+                                backgroundColor: '#1e293b',
+                                titleFont: { size: 12, weight: 'bold' },
+                                bodyFont: { size: 11 },
+                                callbacks: {
+                                    label: function(context) {
+                                        return `Promedio: ${context.raw.toFixed(2)} / 5.00`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                min: 1.0,
+                                max: 5.0,
+                                ticks: { stepSize: 1.0, font: { size: 10, weight: 'bold' } },
+                                grid: { color: 'rgba(241, 245, 249, 1)' }
+                            },
+                            x: {
+                                ticks: { font: { size: 9, weight: '600' } },
+                                grid: { display: false }
+                            }
+                        }
+                    }
+                });
+            },
+
+            // Descarga Completa de Datos desde la Nube (API Sincronización Completa)
+            sincronizarCompletoDesdeNube: async function () {
+                if (!GOOGLE_SHEETS_API_URL) {
+                    showToast('La URL de la API de Google Sheets no está configurada.', 'error');
+                    return;
+                }
+
+                const spinner = document.getElementById('loading-spinner');
+                spinner.classList.remove('hidden');
+
+                try {
+                    // Añadir un timeout de 15 segundos
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+                    const response = await fetch(`${GOOGLE_SHEETS_API_URL}?action=read`, {
+                        signal: controller.signal
+                    });
+                    clearTimeout(timeoutId);
+
+                    const result = await response.json();
+                    
+                    if (result && result.status === 'success' && Array.isArray(result.data)) {
+                        this.evaluacionesData = result.data;
+                        localStorage.setItem('cgb_evaluaciones_cache', JSON.stringify(this.evaluacionesData));
+                        showToast(`¡Sincronización exitosa! Se leyeron ${result.data.length} evaluaciones.`, 'success');
+                        this.render();
+                    } else {
+                        showToast('La estructura de la respuesta de Sheets es incorrecta.', 'error');
+                    }
+                } catch (err) {
+                    console.error("Fallo de lectura de Sheets", err);
+                    showToast('Error de conexión. Se cargaron los datos guardados de contingencia local.', 'info');
+                } finally {
+                    spinner.classList.add('hidden');
+                }
+            },
+
+            // -----------------------------------------------------------------
+            // 6. MODAL DE CONFIGURACIÓN DE RED SEGURO (PROTEGIDO POR LOGIN)
+            // -----------------------------------------------------------------
+            openConfigModal: function () {
+                // El modal de configuración ahora se construye de forma limpia y segura sin comillas que colisionen en caliente
+                const modal = document.createElement('div');
+                modal.id = 'config-network-modal';
+                modal.className = "fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4";
+                
+                modal.innerHTML = `
+                    <div class="glass w-full max-w-lg rounded-3xl p-6 md:p-8 shadow-2xl flex flex-col gap-5 border border-white/50 animate-fadeIn">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h3 class="font-extrabold text-slate-900 text-lg">Parámetros de Red y Enlace Directo</h3>
+                                <p class="text-xs text-slate-400 mt-1">Configure la URL de sincronización con Google Sheets</p>
+                            </div>
+                            <button onclick="app.closeConfigModal()" class="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
+                                <i class="fas fa-times text-sm"></i>
+                            </button>
+                        </div>
+
+                        <div class="bg-blue-50/50 border border-blue-100 rounded-xl p-4 flex gap-3 items-start text-xs text-blue-800 leading-normal">
+                            <i class="fas fa-shield-alt text-blue-500 mt-0.5"></i>
+                            <div>
+                                Pegue el enlace Web App que copió de su editor de <strong>Apps Script</strong>. Asegúrese de que el enlace termine en <strong>/exec</strong> para que la comunicación sea correcta.
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">URL del Servidor (Google Apps Script)</label>
+                            <textarea id="config-api-url" class="w-full bg-white border border-slate-200 rounded-xl p-3 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all h-24 resize-none" placeholder="https://script.google.com/macros/s/.../exec">${GOOGLE_SHEETS_API_URL}</textarea>
+                        </div>
+
+                        <div class="flex items-center gap-2.5 mt-2">
+                            <button onclick="app.closeConfigModal()" class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all">
+                                Cancelar
+                            </button>
+                            <button onclick="app.saveConfigAPI()" class="flex-1 py-3 bg-primary hover:bg-blue-800 text-white rounded-xl text-xs font-bold shadow-md transition-all">
+                                Guardar y Conectar
+                            </button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            },
+
+            closeConfigModal: function () {
+                const modal = document.getElementById('config-network-modal');
+                if (modal) modal.remove();
+            },
+
+            saveConfigAPI: function () {
+                const rawUrl = document.getElementById('config-api-url').value.trim();
+                
+                if (rawUrl === "") {
+                    GOOGLE_SHEETS_API_URL = "";
+                    localStorage.removeItem("CGB_API_URL");
+                    showToast('Se ha desconectado de la nube de Google Sheets.', 'warning');
+                    this.closeConfigModal();
+                    this.render();
+                    return;
+                }
+
+                if (!rawUrl.startsWith('https://script.google.com/') || !rawUrl.endsWith('/exec')) {
+                    showToast('La URL proporcionada no parece un enlace válido de Apps Script (/exec)', 'error');
+                    return;
+                }
+
+                GOOGLE_SHEETS_API_URL = rawUrl;
+                localStorage.setItem("CGB_API_URL", rawUrl);
+                showToast('¡Dirección de conexión actualizada y guardada con éxito!', 'success');
+                this.closeConfigModal();
+                
+                // Forzar sincronización inmediata para validar la nueva conexión
+                this.sincronizarCompletoDesdeNube();
+            }
+        };
+
+        // ==========================================
+        //  SISTEMA AUXILIAR DE TOASTS EN CALIENTE
+        // ==========================================
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const bgColors = {
+                success: 'bg-emerald-600',
+                error: 'bg-rose-600',
+                info: 'bg-slate-800',
+                warning: 'bg-amber-600'
+            };
+            
+            const icons = {
+                success: 'fa-check-circle',
+                error: 'fa-exclamation-circle',
+                info: 'fa-info-circle',
+                warning: 'fa-exclamation-triangle'
+            };
+
+            toast.className = `${bgColors[type] || bgColors.info} text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-3 text-xs font-semibold toast-enter pointer-events-auto`;
+            toast.innerHTML = `
+                <i class="fas ${icons[type] || icons.info} text-sm"></i>
+                <span>${message}</span>
+            `;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.remove('toast-enter');
+                toast.classList.add('toast-exit');
+                setTimeout(() => {
+                    toast.remove();
+                }, 310);
+            }, 3500);
+        }
+
+        // Arranque Inicial de la Aplicación en Window Load
+        window.onload = function () {
+            app.init();
+        }
+    </script>
+</body>
+</html>
